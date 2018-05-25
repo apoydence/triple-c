@@ -86,12 +86,14 @@ func fetchRepo(owner, repo, command string) string {
 	return fmt.Sprintf(`#!/bin/bash
 set -ex
 
+rm -rf %s
 git clone https://github.com/%s/%s --recursive
 
 set +ex
 
 %s
 	`,
+		repo,
 		owner,
 		repo,
 		command,
