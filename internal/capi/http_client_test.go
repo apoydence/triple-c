@@ -60,6 +60,16 @@ func TestHTTPClient(t *testing.T) {
 		Expect(t, err).To(Not(BeNil()))
 	})
 
+	o.Spec("it fetches a new token and tries again (once) for a non-200 status code", func(t TH) {
+		t.spyDoer.resp = &http.Response{
+			StatusCode: 403,
+		}
+		_, err := t.c.Do(t.req)
+		Expect(t, err).To(BeNil())
+
+		Expect(t, t.stubTokenFetcher.called).To(Equal(2))
+	})
+
 	o.Spec("it returns an error if the child-Doer returns an error", func(t TH) {
 		t.spyDoer.err = errors.New("some-error")
 		_, err := t.c.Do(t.req)
