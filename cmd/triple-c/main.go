@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"expvar"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -11,9 +14,11 @@ import (
 	"github.com/apoydence/triple-c/internal/capi"
 	"github.com/apoydence/triple-c/internal/gitwatcher"
 	"github.com/apoydence/triple-c/internal/metrics"
+	"github.com/apoydence/triple-c/internal/scheduler"
 	"github.com/bradylove/envstruct"
 	"github.com/cloudfoundry-incubator/uaago"
 	"github.com/google/go-github/github"
+	"gopkg.in/yaml.v2"
 )
 
 func main() {
@@ -52,50 +57,77 @@ func main() {
 
 	m := metrics.New(expvar.NewMap("TripleC"))
 
-	failedTasks := m.NewCounter("FailedTasks")
-	successfulTasks := m.NewCounter("SuccesssfulTasks")
-	gitwatcher.StartWatcher(
-		cfg.RepoOwner,
-		cfg.RepoName,
-		time.Second,
+	manager := scheduler.NewManager(
+		cfg.VcapApplication.ApplicationID,
+		capi,
 		github.NewClient(nil).Repositories,
-		func(sha string) {
-			log.Printf("Running task for %s", sha)
-			defer log.Printf("Done with task for %s", sha)
-
-			if err := capi.CreateTask(
-				fetchRepo(cfg.RepoOwner, cfg.RepoName, cfg.Command),
-				"some-name",
-				cfg.VcapApplication.ApplicationID,
-			); err != nil {
-				log.Printf("failed to create event: %s", err)
-				failedTasks(1)
-				return
-			}
-			successfulTasks(1)
-		},
+		gitwatcher.StartWatcher,
 		m,
 		log,
 	)
+	sched := scheduler.New(manager)
+
+	go func() {
+		successfulConfig := m.NewCounter("SuccesssfulConifig")
+		failConfig := m.NewCounter("FailedConifig")
+		gitwatcher.StartWatcher(
+			context.Background(),
+			cfg.RepoOwner,
+			cfg.RepoName,
+			github.NewClient(nil).Repositories,
+			func(sha string) {
+				var ts []scheduler.Task
+				for _, t := range fetchConfigFile(sha, cfg, failConfig, successfulConfig, log).Tasks {
+					ts = append(ts, t)
+				}
+				sched.SetTasks(ts)
+			},
+			m,
+			log,
+		)
+	}()
 
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), nil))
 }
 
-// fetchRepo adds the cloning of a repo to the given command
-func fetchRepo(owner, repo, command string) string {
-	return fmt.Sprintf(`#!/bin/bash
-set -ex
-
-rm -rf %s
-git clone https://github.com/%s/%s --recursive
-
-set +ex
-
-%s
-	`,
-		repo,
-		owner,
-		repo,
-		command,
+func fetchConfigFile(SHA string, cfg Config, fail, succ func(uint64), log *log.Logger) scheduler.Tasks {
+	path := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s",
+		cfg.RepoOwner,
+		cfg.RepoName,
+		SHA,
+		cfg.ConfigPath,
 	)
+	log.Printf("Reading config from %s", path)
+	resp, err := http.Get(path)
+	if err != nil {
+		log.Printf("failed to find config file: %s", err)
+	}
+
+	defer func() {
+		io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close()
+	}()
+
+	if resp.StatusCode != 200 {
+		log.Printf("failed to find config file: %d", resp.StatusCode)
+		fail(1)
+		return scheduler.Tasks{}
+	}
+
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("failed to find config file: %s", err)
+		fail(1)
+		return scheduler.Tasks{}
+	}
+
+	var t scheduler.Tasks
+	if err := yaml.Unmarshal([]byte(data), &t); err != nil {
+		log.Printf("failed to find config file: %s", err)
+		fail(1)
+		return scheduler.Tasks{}
+	}
+
+	succ(1)
+	return t
 }

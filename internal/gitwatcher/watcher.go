@@ -35,9 +35,9 @@ type CommitLister interface {
 }
 
 func StartWatcher(
+	ctx context.Context,
 	owner string,
 	repo string,
-	interval time.Duration,
 	lister CommitLister,
 	commit func(SHA string),
 	m Metrics,
@@ -54,12 +54,18 @@ func StartWatcher(
 		githubErrs:  m.NewCounter("GithubErrs"),
 	}
 
-	go w.start(interval)
+	go w.start(ctx)
 }
 
-func (w *Watcher) start(interval time.Duration) {
+func (w *Watcher) start(ctx context.Context) {
+	w.log.Printf("starting git watcher for %s/%s", w.owner, w.repo)
+	defer w.log.Printf("done watching for %s/%s", w.owner, w.repo)
+
 	var last string
 	for {
+		if ctx.Err() != nil {
+			return
+		}
 		last = w.readFromGithub(last)
 	}
 }

@@ -1,0 +1,32 @@
+---
+
+tasks:
+- repo_owner: apoydence
+  repo_name: triple-c
+  command: |
+    set -ex
+
+    export DESTINATION=/dev/shm
+
+    wget https://dl.google.com/go/go1.10.2.linux-amd64.tar.gz -O $DESTINATION/go1.10.2.linux-amd64.tar.gz
+
+    tar -C $DESTINATION -xzf $DESTINATION/go1.10.2.linux-amd64.tar.gz
+
+    export PATH=$PATH:$DESTINATION/go/bin
+
+    mkdir -p workspace
+    pushd workspace
+        export GOPATH=$(pwd)
+    popd
+
+    go version
+
+    export OWNER=apoydence
+    export REPO=triple-c
+
+    mkdir -p $GOPATH/src/github.com/$OWNER/
+    mv $REPO $GOPATH/src/github.com/$OWNER/
+    pushd $GOPATH/src/github.com/$OWNER/$REPO
+        go get -t -d ./...
+        go test --race ./...
+    popd

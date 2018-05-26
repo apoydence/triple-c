@@ -8,15 +8,16 @@ import (
 )
 
 type Config struct {
-	Port              uint16          `env:"PORT, required, report"`
-	VcapApplication   VcapApplication `env:"VCAP_APPLICATION, required, report"`
-	RepoOwner         string          `env:"REPO_OWNER, required, report"`
-	RepoName          string          `env:"REPO_NAME, required, report"`
-	ClientID          string          `env:"CLIENT_ID, required"`
-	RefreshToken      string          `env:"REFRESH_TOKEN, required"`
-	SkipSSLValidation bool            `env:"SKIP_SSL_VALIDATION"`
+	Port            uint16          `env:"PORT, required, report"`
+	VcapApplication VcapApplication `env:"VCAP_APPLICATION, required"`
 
-	Command string `env:"COMMAND, required"`
+	ClientID          string `env:"CLIENT_ID, required"`
+	RefreshToken      string `env:"REFRESH_TOKEN, required"`
+	SkipSSLValidation bool   `env:"SKIP_SSL_VALIDATION, report"`
+
+	RepoOwner  string `env:"REPO_OWNER, required, report"`
+	RepoName   string `env:"REPO_NAME, required, report"`
+	ConfigPath string `env:"CONFIG_PATH, required, report"`
 
 	// Figured out via VcapApplication
 	UAAAddr string

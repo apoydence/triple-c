@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/apoydence/onpar"
 	. "github.com/apoydence/onpar/expect"
@@ -88,6 +87,46 @@ func TestWatcher(t *testing.T) {
 		Expect(t, t.Shas).To(ViaPolling(Equal([]string{"some-sha", "some-other-sha"})))
 	})
 
+	o.Spec("stops watching when context is canceled", func(t *TW) {
+		sha1 := "some-sha"
+		sha2 := "some-other-sha"
+		t.spyCommitLister.errs = []error{nil, nil, nil}
+		t.spyCommitLister.commits = [][]*github.RepositoryCommit{
+			{{
+				SHA: &sha1,
+			}},
+			{{
+				SHA: &sha1,
+			}},
+			{{
+				SHA: &sha2,
+			}},
+		}
+		t.spyCommitLister.resps = []*github.Response{
+			{
+				Response: &http.Response{
+					StatusCode: 200,
+				},
+			},
+			{
+				Response: &http.Response{
+					StatusCode: 200,
+				},
+			},
+			{
+				Response: &http.Response{
+					StatusCode: 200,
+				},
+			},
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		startWatcherWithContext(ctx, t)
+
+		Expect(t, t.Shas).To(Always(HaveLen(0)))
+	})
+
 	o.Spec("handles empty responses and nil commits", func(t *TW) {
 		t.spyCommitLister.errs = []error{nil, nil}
 		t.spyCommitLister.commits = [][]*github.RepositoryCommit{
@@ -155,11 +194,27 @@ func TestWatcher(t *testing.T) {
 	})
 }
 
-func startWatcher(t *TW) {
+func startWatcherWithContext(ctx context.Context, t *TW) {
 	gitwatcher.StartWatcher(
+		ctx,
 		"some-owner",
 		"some-repo",
-		time.Millisecond,
+		t.spyCommitLister,
+		func(sha string) {
+			t.mu.Lock()
+			defer t.mu.Unlock()
+			t.shas = append(t.shas, sha)
+		},
+		t.spyMetrics,
+		log.New(ioutil.Discard, "", 0),
+	)
+}
+
+func startWatcher(t *TW) {
+	gitwatcher.StartWatcher(
+		context.Background(),
+		"some-owner",
+		"some-repo",
 		t.spyCommitLister,
 		func(sha string) {
 			t.mu.Lock()
