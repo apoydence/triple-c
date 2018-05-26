@@ -82,6 +82,7 @@ func main() {
 				}
 				sched.SetTasks(ts)
 			},
+			time.Minute,
 			m,
 			log,
 		)

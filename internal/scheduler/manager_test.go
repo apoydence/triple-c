@@ -7,6 +7,7 @@ import (
 	"log"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/apoydence/onpar"
 	. "github.com/apoydence/onpar/expect"
@@ -148,13 +149,14 @@ func (s *spyTaskCreator) CreateTask(
 }
 
 type spyGitWatcher struct {
-	ctx    context.Context
-	owner  string
-	repo   string
-	lister gitwatcher.CommitLister
-	commit func(SHA string)
-	m      gitwatcher.Metrics
-	log    *log.Logger
+	ctx     context.Context
+	owner   string
+	repo    string
+	lister  gitwatcher.CommitLister
+	commit  func(SHA string)
+	backoff time.Duration
+	m       gitwatcher.Metrics
+	log     *log.Logger
 }
 
 func newSpyGitWatcher() *spyGitWatcher {
@@ -167,6 +169,7 @@ func (s *spyGitWatcher) StartWatcher(
 	repo string,
 	lister gitwatcher.CommitLister,
 	commit func(SHA string),
+	backoff time.Duration,
 	m gitwatcher.Metrics,
 	log *log.Logger,
 ) {
@@ -175,6 +178,7 @@ func (s *spyGitWatcher) StartWatcher(
 	s.repo = repo
 	s.lister = lister
 	s.commit = commit
+	s.backoff = backoff
 	s.m = m
 	s.log = log
 }

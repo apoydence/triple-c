@@ -11,10 +11,11 @@ import (
 )
 
 type Watcher struct {
-	owner  string
-	repo   string
-	lister CommitLister
-	commit func(SHA string)
+	owner   string
+	repo    string
+	lister  CommitLister
+	commit  func(SHA string)
+	backoff time.Duration
 
 	githubReads func(delta uint64)
 	githubErrs  func(delta uint64)
@@ -40,15 +41,17 @@ func StartWatcher(
 	repo string,
 	lister CommitLister,
 	commit func(SHA string),
+	backoff time.Duration,
 	m Metrics,
 	log *log.Logger,
 ) {
 	w := &Watcher{
-		owner:  owner,
-		repo:   repo,
-		lister: lister,
-		commit: commit,
-		log:    log,
+		owner:   owner,
+		repo:    repo,
+		lister:  lister,
+		commit:  commit,
+		log:     log,
+		backoff: backoff,
 
 		githubReads: m.NewCounter("GithubReads"),
 		githubErrs:  m.NewCounter("GithubErrs"),
@@ -85,6 +88,7 @@ func (w *Watcher) readFromGithub(lastSHA string) string {
 	if err != nil {
 		w.log.Printf("failed to read commits from github: %s", err)
 		w.githubErrs(1)
+		time.Sleep(w.backoff)
 		return lastSHA
 	}
 
@@ -102,6 +106,7 @@ func (w *Watcher) readFromGithub(lastSHA string) string {
 	if resp.StatusCode != http.StatusOK {
 		w.log.Printf("unexpected status code from github: %d", resp.StatusCode)
 		w.githubErrs(1)
+		time.Sleep(w.backoff)
 		return lastSHA
 	}
 

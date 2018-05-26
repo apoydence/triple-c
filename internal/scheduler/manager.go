@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/apoydence/triple-c/internal/gitwatcher"
 )
@@ -31,6 +32,7 @@ type GitWatcher func(
 	repo string,
 	lister gitwatcher.CommitLister,
 	commit func(SHA string),
+	backoff time.Duration,
 	m gitwatcher.Metrics,
 	log *log.Logger,
 )
@@ -106,6 +108,7 @@ func (m *Manager) Add(t Task) {
 
 			m.successfulTasks(1)
 		},
+		time.Minute,
 		m.m,
 		m.log,
 	)

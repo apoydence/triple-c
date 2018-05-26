@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/apoydence/onpar"
 	. "github.com/apoydence/onpar/expect"
@@ -205,6 +206,7 @@ func startWatcherWithContext(ctx context.Context, t *TW) {
 			defer t.mu.Unlock()
 			t.shas = append(t.shas, sha)
 		},
+		time.Nanosecond,
 		t.spyMetrics,
 		log.New(ioutil.Discard, "", 0),
 	)
@@ -221,6 +223,7 @@ func startWatcher(t *TW) {
 			defer t.mu.Unlock()
 			t.shas = append(t.shas, sha)
 		},
+		time.Nanosecond,
 		t.spyMetrics,
 		log.New(ioutil.Discard, "", 0),
 	)
