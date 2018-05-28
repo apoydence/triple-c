@@ -1,8 +1,7 @@
 ---
 
 tasks:
-- repo_owner: apoydence
-  repo_name: triple-c
+- repo_path: https://github.com/apoydence/triple-c
   command: |
     set -ex
 

@@ -33,53 +33,53 @@ func TestScheduler(t *testing.T) {
 	o.Spec("it adds new tasks to the manager", func(t TS) {
 		t.s.SetTasks([]scheduler.Task{
 			{
-				RepoOwner: "a",
+				RepoPath: "a",
 			},
 			{
-				RepoOwner: "b",
+				RepoPath: "b",
 			},
 		})
 
 		Expect(t, t.spyTaskManager.adds).To(HaveLen(2))
 		Expect(t, t.spyTaskManager.adds).To(Contain(
-			scheduler.Task{RepoOwner: "a"},
-			scheduler.Task{RepoOwner: "b"},
+			scheduler.Task{RepoPath: "a"},
+			scheduler.Task{RepoPath: "b"},
 		))
 	})
 
 	o.Spec("it does not add the same task twice", func(t TS) {
 		t.s.SetTasks([]scheduler.Task{
 			{
-				RepoOwner: "a",
+				RepoPath: "a",
 			},
 		})
 		t.s.SetTasks([]scheduler.Task{
 			{
-				RepoOwner: "a",
+				RepoPath: "a",
 			},
 		})
 
 		Expect(t, t.spyTaskManager.adds).To(HaveLen(1))
 		Expect(t, t.spyTaskManager.adds).To(Contain(
-			scheduler.Task{RepoOwner: "a"},
+			scheduler.Task{RepoPath: "a"},
 		))
 	})
 
 	o.Spec("it removes stale tasks", func(t TS) {
 		t.s.SetTasks([]scheduler.Task{
 			{
-				RepoOwner: "a",
+				RepoPath: "a",
 			},
 		})
 		t.s.SetTasks([]scheduler.Task{
 			{
-				RepoOwner: "b",
+				RepoPath: "b",
 			},
 		})
 
 		Expect(t, t.spyTaskManager.removes).To(HaveLen(1))
 		Expect(t, t.spyTaskManager.removes).To(Contain(
-			scheduler.Task{RepoOwner: "a"},
+			scheduler.Task{RepoPath: "a"},
 		))
 	})
 }

@@ -18,10 +18,11 @@ import (
 
 type TM struct {
 	*testing.T
-	spyTaskCreator *spyTaskCreator
-	spyGitWatcher  *spyGitWatcher
-	spyMetrics     *spyMetrics
-	m              *scheduler.Manager
+	spyTaskCreator  *spyTaskCreator
+	spyGitWatcher   *spyGitWatcher
+	spyMetrics      *spyMetrics
+	spyRepoRegistry *spyRepoRegistry
+	m               *scheduler.Manager
 }
 
 func TestManager(t *testing.T) {
@@ -33,39 +34,29 @@ func TestManager(t *testing.T) {
 		spyMetrics := newSpyMetrics()
 		spyTaskCreator := newSpyTaskCreator()
 		spyGitWatcher := newSpyGitWatcher()
+		spyRepoRegistry := newSpyRepoRegistry()
 		return TM{
-			T:              t,
-			spyMetrics:     spyMetrics,
-			spyGitWatcher:  spyGitWatcher,
-			spyTaskCreator: spyTaskCreator,
+			T:               t,
+			spyMetrics:      spyMetrics,
+			spyGitWatcher:   spyGitWatcher,
+			spyTaskCreator:  spyTaskCreator,
+			spyRepoRegistry: spyRepoRegistry,
 
 			m: scheduler.NewManager(
 				"some-guid",
 				spyTaskCreator,
-				nil,
 				spyGitWatcher.StartWatcher,
+				spyRepoRegistry,
 				spyMetrics,
 				log.New(ioutil.Discard, "", 0),
 			),
 		}
 	})
 
-	o.Spec("it starts watching a git repo when added", func(t TM) {
-		t.m.Add(scheduler.Task{
-			RepoOwner: "some-owner",
-			RepoName:  "some-name",
-		})
-
-		Expect(t, t.spyGitWatcher.owner).To(Equal("some-owner"))
-		Expect(t, t.spyGitWatcher.repo).To(Equal("some-name"))
-		Expect(t, t.spyGitWatcher.ctx.Err()).To(BeNil())
-	})
-
 	o.Spec("it starts a task when a commit comes through", func(t TM) {
 		t.m.Add(scheduler.Task{
-			RepoOwner: "some-owner",
-			RepoName:  "some-name",
-			Command:   "some-command",
+			RepoPath: "some-path",
+			Command:  "some-command",
 		})
 
 		Expect(t, t.spyGitWatcher.commit).To(Not(BeNil()))
@@ -81,9 +72,8 @@ func TestManager(t *testing.T) {
 	o.Spec("it increments FailedTasks when a task fails", func(t TM) {
 		t.spyTaskCreator.err = errors.New("some-error")
 		t.m.Add(scheduler.Task{
-			RepoOwner: "some-owner",
-			RepoName:  "some-name",
-			Command:   "some-command",
+			RepoPath: "some-path",
+			Command:  "some-command",
 		})
 		Expect(t, t.spyGitWatcher.commit).To(Not(BeNil()))
 		t.spyGitWatcher.commit("some-sha")
@@ -92,17 +82,26 @@ func TestManager(t *testing.T) {
 		Expect(t, t.spyMetrics.GetDelta("FailedTasks")()).To(Equal(uint64(1)))
 	})
 
+	o.Spec("it increments FailedRepos when a repo fails to be fetched", func(t TM) {
+		t.spyRepoRegistry.err = errors.New("some-err")
+		t.m.Add(scheduler.Task{
+			RepoPath: "some-path",
+			Command:  "some-command",
+		})
+
+		Expect(t, t.spyMetrics.GetDelta("FailedRepos")()).To(Equal(uint64(1)))
+		Expect(t, t.spyGitWatcher.ctx).To(BeNil())
+	})
+
 	o.Spec("it cancels the context when a task is removed", func(t TM) {
 		t.m.Add(scheduler.Task{
-			RepoOwner: "some-owner",
-			RepoName:  "some-name",
-			Command:   "some-command",
+			RepoPath: "some-path",
+			Command:  "some-command",
 		})
 
 		t.m.Remove(scheduler.Task{
-			RepoOwner: "some-owner",
-			RepoName:  "some-name",
-			Command:   "some-command",
+			RepoPath: "some-path",
+			Command:  "some-command",
 		})
 
 		Expect(t, t.spyGitWatcher.ctx.Err()).To(Not(BeNil()))
@@ -114,9 +113,8 @@ func TestManager(t *testing.T) {
 	o.Spec("it handles removing a task that never was added", func(t TM) {
 		Expect(t, func() {
 			t.m.Remove(scheduler.Task{
-				RepoOwner: "some-owner",
-				RepoName:  "some-name",
-				Command:   "some-command",
+				RepoPath: "some-path",
+				Command:  "some-command",
 			})
 		}).To(Not(Panic()))
 	})
@@ -149,14 +147,12 @@ func (s *spyTaskCreator) CreateTask(
 }
 
 type spyGitWatcher struct {
-	ctx     context.Context
-	owner   string
-	repo    string
-	lister  gitwatcher.CommitLister
-	commit  func(SHA string)
-	backoff time.Duration
-	m       gitwatcher.Metrics
-	log     *log.Logger
+	ctx        context.Context
+	commit     func(SHA string)
+	interval   time.Duration
+	shaFetcher gitwatcher.SHAFetcher
+	m          gitwatcher.Metrics
+	log        *log.Logger
 }
 
 func newSpyGitWatcher() *spyGitWatcher {
@@ -165,20 +161,16 @@ func newSpyGitWatcher() *spyGitWatcher {
 
 func (s *spyGitWatcher) StartWatcher(
 	ctx context.Context,
-	owner string,
-	repo string,
-	lister gitwatcher.CommitLister,
 	commit func(SHA string),
-	backoff time.Duration,
+	interval time.Duration,
+	shaFetcher gitwatcher.SHAFetcher,
 	m gitwatcher.Metrics,
 	log *log.Logger,
 ) {
 	s.ctx = ctx
-	s.owner = owner
-	s.repo = repo
-	s.lister = lister
 	s.commit = commit
-	s.backoff = backoff
+	s.interval = interval
+	s.shaFetcher = shaFetcher
 	s.m = m
 	s.log = log
 }
@@ -208,4 +200,20 @@ func (s *spyMetrics) GetDelta(name string) func() uint64 {
 		defer s.mu.Unlock()
 		return s.m[name]
 	}
+}
+
+type spyRepoRegistry struct {
+	path string
+
+	repo *gitwatcher.Repo
+	err  error
+}
+
+func newSpyRepoRegistry() *spyRepoRegistry {
+	return &spyRepoRegistry{}
+}
+
+func (s *spyRepoRegistry) FetchRepo(path string) (*gitwatcher.Repo, error) {
+	s.path = path
+	return s.repo, s.err
 }

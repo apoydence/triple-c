@@ -15,8 +15,7 @@ type Config struct {
 	RefreshToken      string `env:"REFRESH_TOKEN, required"`
 	SkipSSLValidation bool   `env:"SKIP_SSL_VALIDATION, report"`
 
-	RepoOwner  string `env:"REPO_OWNER, required, report"`
-	RepoName   string `env:"REPO_NAME, required, report"`
+	RepoPath   string `env:"REPO_PATH, required, report"`
 	ConfigPath string `env:"CONFIG_PATH, required, report"`
 
 	// Figured out via VcapApplication

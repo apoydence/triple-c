@@ -11,9 +11,8 @@ type Tasks struct {
 }
 
 type Task struct {
-	RepoOwner string `yaml:"repo_owner"`
-	RepoName  string `yaml:"repo_name"`
-	Command   string `yaml:"command"`
+	RepoPath string `yaml:"repo_path"`
+	Command  string `yaml:"command"`
 }
 
 type TaskManager interface {
