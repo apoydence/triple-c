@@ -7,7 +7,10 @@ tasks:
 
     export DESTINATION=/dev/shm
 
-    wget https://dl.google.com/go/go1.10.2.linux-amd64.tar.gz -O $DESTINATION/go1.10.2.linux-amd64.tar.gz
+    wget \
+      https://dl.google.com/go/go1.10.2.linux-amd64.tar.gz \
+      -O $DESTINATION/go1.10.2.linux-amd64.tar.gz \
+      --quiet
 
     tar -C $DESTINATION -xzf $DESTINATION/go1.10.2.linux-amd64.tar.gz
 
