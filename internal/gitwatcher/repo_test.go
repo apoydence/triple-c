@@ -52,13 +52,13 @@ func TestRepo(t *testing.T) {
 			[]error{nil},
 		)
 
-		sha, err := t.r.SHA()
+		sha, err := t.r.SHA("some-branch")
 		Expect(t, err).To(BeNil())
 		Expect(t, sha).To(Equal("some-sha"))
 
 		Expect(t, t.spyExecutor.Paths()).To(Contain(path.Join(t.tmpDir, "c29tZS1wYXRo")))
 		Expect(t, t.spyExecutor.Commands()).To(Contain([]string{
-			"git", "rev-parse", "HEAD",
+			"git", "rev-parse", "some-branch",
 		}))
 	})
 
@@ -68,7 +68,27 @@ func TestRepo(t *testing.T) {
 			[]error{errors.New("some-error")},
 		)
 
-		_, err := t.r.SHA()
+		_, err := t.r.SHA("some-branch")
+		Expect(t, err).To(Not(BeNil()))
+	})
+
+	o.Spec("it returns an error if fetching the SHA returns empty results", func(t TR) {
+		t.spyExecutor.SetResults(
+			[][]string{nil},
+			[]error{nil},
+		)
+
+		_, err := t.r.SHA("some-branch")
+		Expect(t, err).To(Not(BeNil()))
+	})
+
+	o.Spec("it returns an error if fetching the file contents fails", func(t TR) {
+		t.spyExecutor.SetResults(
+			[][]string{nil},
+			[]error{errors.New("some-error")},
+		)
+
+		_, err := t.r.File("some-sha", "some-path")
 		Expect(t, err).To(Not(BeNil()))
 	})
 
@@ -88,23 +108,29 @@ func TestRepo(t *testing.T) {
 		}))
 	})
 
-	o.Spec("it returns an error if fetching the file contents fails", func(t TR) {
+	o.Spec("it returns the branches", func(t TR) {
+		t.spyExecutor.SetResults(
+			[][]string{{"branch-1", "remotes/origin/HEAD -> origin/master", "     remotes/origin/branch-1", "remotes/origin/branch-2 "}},
+			[]error{nil},
+		)
+
+		branches, err := t.r.ListBranches()
+		Expect(t, err).To(BeNil())
+		Expect(t, branches).To(Equal([]string{"remotes/origin/branch-1", "remotes/origin/branch-2"}))
+
+		Expect(t, t.spyExecutor.Paths()).To(Contain(path.Join(t.tmpDir, "c29tZS1wYXRo")))
+		Expect(t, t.spyExecutor.Commands()).To(Contain([]string{
+			"git", "branch", "-a",
+		}))
+	})
+
+	o.Spec("it returns an error if fetching the branches fails", func(t TR) {
 		t.spyExecutor.SetResults(
 			[][]string{nil},
 			[]error{errors.New("some-error")},
 		)
 
-		_, err := t.r.File("some-sha", "some-path")
-		Expect(t, err).To(Not(BeNil()))
-	})
-
-	o.Spec("it returns an error if fetching the SHA returns empty results", func(t TR) {
-		t.spyExecutor.SetResults(
-			[][]string{nil},
-			[]error{nil},
-		)
-
-		_, err := t.r.SHA()
+		_, err := t.r.ListBranches()
 		Expect(t, err).To(Not(BeNil()))
 	})
 

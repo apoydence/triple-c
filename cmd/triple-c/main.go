@@ -93,34 +93,58 @@ func main() {
 		log.Fatalf("failed to get config repo (%s): %s", cfg.RepoPath, err)
 	}
 
-	manager := scheduler.NewManager(
-		cfg.VcapApplication.ApplicationID,
-		capi,
-		gitwatcher.StartWatcher,
-		repoRegistry,
+	startBranch := func(ctx context.Context, branch string) {
+		go func() {
+			log.Printf("Watch branch %s", branch)
+			manager := scheduler.NewManager(
+				ctx,
+				cfg.VcapApplication.ApplicationID,
+				branch,
+				capi,
+				gitwatcher.StartWatcher,
+				repoRegistry,
+				m,
+				log,
+			)
+			sched := scheduler.New(manager)
+
+			successfulConfig := m.NewCounter("SuccesssfulConifig")
+			failConfig := m.NewCounter("FailedConifig")
+			gitwatcher.StartWatcher(
+				ctx,
+				branch,
+				func(sha string) {
+					var ts []scheduler.Task
+					for _, t := range fetchConfigFile(sha, cfg.ConfigPath, configRepo, failConfig, successfulConfig, log).Tasks {
+						if t.Command == "" || t.RepoPath == "" {
+							log.Printf("invalid task: %+v", t)
+							continue
+						}
+						ts = append(ts, t)
+					}
+					sched.SetTasks(ts)
+				},
+				time.Minute,
+				configRepo,
+				m,
+				log,
+			)
+		}()
+	}
+
+	branchManager := scheduler.NewBranchManager(startBranch)
+	branchSched := scheduler.NewBranchScheduler(branchManager)
+
+	gitwatcher.StartBranchWatcher(
+		context.Background(),
+		configRepo,
+		func(branches []string) {
+			branchSched.SetBranches(branches)
+		},
+		time.Minute,
 		m,
 		log,
 	)
-	sched := scheduler.New(manager)
-
-	go func() {
-		successfulConfig := m.NewCounter("SuccesssfulConifig")
-		failConfig := m.NewCounter("FailedConifig")
-		gitwatcher.StartWatcher(
-			context.Background(),
-			func(sha string) {
-				var ts []scheduler.Task
-				for _, t := range fetchConfigFile(sha, cfg.ConfigPath, configRepo, failConfig, successfulConfig, log).Tasks {
-					ts = append(ts, t)
-				}
-				sched.SetTasks(ts)
-			},
-			time.Minute,
-			configRepo,
-			m,
-			log,
-		)
-	}()
 
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), nil))
 }

@@ -43,7 +43,9 @@ func TestManager(t *testing.T) {
 			spyRepoRegistry: spyRepoRegistry,
 
 			m: scheduler.NewManager(
+				context.Background(),
 				"some-guid",
+				"some-branch",
 				spyTaskCreator,
 				spyGitWatcher.StartWatcher,
 				spyRepoRegistry,
@@ -60,6 +62,7 @@ func TestManager(t *testing.T) {
 		})
 
 		Expect(t, t.spyGitWatcher.commit).To(Not(BeNil()))
+		Expect(t, t.spyGitWatcher.branch).To(Equal("some-branch"))
 		t.spyGitWatcher.commit("some-sha")
 		Expect(t, t.spyTaskCreator.command).To(ContainSubstring("some-command"))
 		Expect(t, t.spyTaskCreator.name).To(Not(Equal("")))
@@ -148,6 +151,7 @@ func (s *spyTaskCreator) CreateTask(
 
 type spyGitWatcher struct {
 	ctx        context.Context
+	branch     string
 	commit     func(SHA string)
 	interval   time.Duration
 	shaFetcher gitwatcher.SHAFetcher
@@ -161,6 +165,7 @@ func newSpyGitWatcher() *spyGitWatcher {
 
 func (s *spyGitWatcher) StartWatcher(
 	ctx context.Context,
+	branch string,
 	commit func(SHA string),
 	interval time.Duration,
 	shaFetcher gitwatcher.SHAFetcher,
@@ -168,6 +173,7 @@ func (s *spyGitWatcher) StartWatcher(
 	log *log.Logger,
 ) {
 	s.ctx = ctx
+	s.branch = branch
 	s.commit = commit
 	s.interval = interval
 	s.shaFetcher = shaFetcher

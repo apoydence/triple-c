@@ -18,6 +18,7 @@ type Manager struct {
 	failedTasks     func(delta uint64)
 	failedRepos     func(delta uint64)
 	appGuid         string
+	branch          string
 
 	taskCreator TaskCreator
 
@@ -30,6 +31,7 @@ type Manager struct {
 
 type GitWatcher func(
 	ctx context.Context,
+	branch string,
 	commit func(SHA string),
 	interval time.Duration,
 	shaFetcher gitwatcher.SHAFetcher,
@@ -54,7 +56,9 @@ type RepoRegistry interface {
 }
 
 func NewManager(
+	ctx context.Context,
 	appGuid string,
+	branch string,
 	tc TaskCreator,
 	w GitWatcher,
 	repoRegistry RepoRegistry,
@@ -71,6 +75,7 @@ func NewManager(
 		startWatcher: w,
 		repoRegistry: repoRegistry,
 		appGuid:      appGuid,
+		branch:       branch,
 		m:            m,
 
 		taskCreator: tc,
@@ -97,6 +102,7 @@ func (m *Manager) Add(t Task) {
 
 	m.startWatcher(
 		ctx,
+		m.branch,
 		func(SHA string) {
 			m.mu.Lock()
 			_, ok := m.ctxs[t]
@@ -109,7 +115,7 @@ func (m *Manager) Add(t Task) {
 			defer m.log.Printf("done with task for %s", SHA)
 
 			err := m.taskCreator.CreateTask(
-				m.fetchRepo(t.RepoPath, t.Command),
+				m.fetchRepo(t.RepoPath, t.Command, m.branch),
 				"some-name",
 				m.appGuid,
 			)
@@ -141,19 +147,30 @@ func (m *Manager) Remove(t Task) {
 }
 
 // fetchRepo adds the cloning of a repo to the given command
-func (m *Manager) fetchRepo(repoPath, command string) string {
+func (m *Manager) fetchRepo(repoPath, command, branch string) string {
 	return fmt.Sprintf(`#!/bin/bash
 set -ex
 
 rm -rf %s
-git clone %s --recursive
+git clone %s
 
-set +ex
+
+# If checking out fails, its fine. Move forward with the default branch.
+set +e
+
+pushd %s
+  git checkout %s
+  git submodule update --init --recursive
+popd
+
+set +x
 
 %s
 	`,
 		path.Base(repoPath),
 		repoPath,
+		path.Base(repoPath),
+		branch,
 		command,
 	)
 }

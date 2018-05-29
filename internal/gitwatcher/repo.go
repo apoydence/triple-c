@@ -63,17 +63,17 @@ func NewRepo(
 	return r, nil
 }
 
-func (r *Repo) SHA() (string, error) {
+func (r *Repo) SHA(branch string) (string, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	results, err := r.exec.Run(
 		r.repoPath,
-		"git", "rev-parse", "HEAD",
+		"git", "rev-parse", branch,
 	)
 
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("|%s| %s: %s", r.repoPath, branch, err)
 	}
 
 	if len(results) == 0 {
@@ -97,6 +97,31 @@ func (r *Repo) File(SHA, filePath string) (string, error) {
 	}
 
 	return strings.Join(results, "\n"), nil
+}
+
+func (r *Repo) ListBranches() ([]string, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	results, err := r.exec.Run(
+		r.repoPath,
+		"git", "branch", "-a",
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var branches []string
+	for _, result := range results {
+		result = strings.TrimSpace(result)
+		if !strings.HasPrefix(result, "remotes/origin") || strings.Contains(result, "->") {
+			continue
+		}
+		branches = append(branches, result)
+	}
+
+	return branches, nil
 }
 
 func (r *Repo) start(interval time.Duration) {
