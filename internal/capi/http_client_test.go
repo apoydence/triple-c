@@ -61,7 +61,7 @@ func TestHTTPClient(t *testing.T) {
 	})
 
 	o.Spec("it fetches a new token and tries again (once) for a non-200 status code", func(t TH) {
-		t.spyDoer.resp = &http.Response{
+		t.spyDoer.m["GET:http://some.url"] = &http.Response{
 			StatusCode: 403,
 		}
 		_, err := t.c.Do(t.req)

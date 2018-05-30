@@ -2,6 +2,8 @@ package scheduler
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 	"path"
@@ -17,6 +19,7 @@ type Manager struct {
 	successfulTasks func(delta uint64)
 	failedTasks     func(delta uint64)
 	failedRepos     func(delta uint64)
+	dedupedTasks    func(delta uint64)
 	appGuid         string
 	branch          string
 
@@ -45,6 +48,8 @@ type TaskCreator interface {
 		name string,
 		appGuid string,
 	) error
+
+	ListTasks(appGuid string) ([]string, error)
 }
 
 type Metrics interface {
@@ -68,6 +73,7 @@ func NewManager(
 
 	successfulTasks := m.NewCounter("SuccessfulTasks")
 	failedTasks := m.NewCounter("FailedTasks")
+	dedupedTasks := m.NewCounter("DedupedTasks")
 	failedRepos := m.NewCounter("FailedRepos")
 
 	return &Manager{
@@ -83,6 +89,7 @@ func NewManager(
 		successfulTasks: successfulTasks,
 		failedTasks:     failedTasks,
 		failedRepos:     failedRepos,
+		dedupedTasks:    dedupedTasks,
 
 		ctxs: make(map[Task]func()),
 	}
@@ -111,12 +118,34 @@ func (m *Manager) Add(t Task) {
 				return
 			}
 
+			dupe, err := m.duplicate(SHA)
+			if err != nil {
+				m.log.Printf("failed deduping tasks: %s", err)
+				return
+			}
+
+			if dupe {
+				m.log.Printf("skipping task for %s", SHA)
+				m.dedupedTasks(1)
+				return
+			}
+
 			m.log.Printf("starting task for %s", SHA)
 			defer m.log.Printf("done with task for %s", SHA)
 
-			err := m.taskCreator.CreateTask(
+			name, err := json.Marshal(struct {
+				SHA string `json:"sha"`
+			}{
+				SHA: SHA,
+			})
+			if err != nil {
+				log.Print(err)
+				return
+			}
+
+			err = m.taskCreator.CreateTask(
 				m.fetchRepo(t.RepoPath, t.Command, m.branch),
-				"some-name",
+				base64.StdEncoding.EncodeToString(name),
 				m.appGuid,
 			)
 			if err != nil {
@@ -132,6 +161,33 @@ func (m *Manager) Add(t Task) {
 		m.m,
 		m.log,
 	)
+}
+
+func (m *Manager) duplicate(SHA string) (bool, error) {
+	tasks, err := m.taskCreator.ListTasks(m.appGuid)
+	if err != nil {
+		return false, err
+	}
+
+	for _, t := range tasks {
+		data, err := base64.StdEncoding.DecodeString(t)
+		if err != nil {
+			continue
+		}
+
+		var taskMeta struct {
+			SHA string `json:"sha"`
+		}
+		if err := json.Unmarshal(data, &taskMeta); err != nil {
+			continue
+		}
+
+		if taskMeta.SHA == SHA {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (m *Manager) Remove(t Task) {
