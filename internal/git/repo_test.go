@@ -1,4 +1,4 @@
-package gitwatcher_test
+package git_test
 
 import (
 	"errors"
@@ -12,14 +12,14 @@ import (
 	"github.com/apoydence/onpar"
 	. "github.com/apoydence/onpar/expect"
 	. "github.com/apoydence/onpar/matchers"
-	"github.com/apoydence/triple-c/internal/gitwatcher"
+	"github.com/apoydence/triple-c/internal/git"
 )
 
 type TR struct {
 	*testing.T
 	spyExecutor *spyExecutor
 	spyMetrics  *spyMetrics
-	r           *gitwatcher.Repo
+	r           *git.Repo
 	tmpDir      string
 }
 
@@ -34,7 +34,7 @@ func TestRepo(t *testing.T) {
 		spyExecutor := newSpyExecutor()
 		spyMetrics := newSpyMetrics()
 
-		r, err := gitwatcher.NewRepo("some-path", tmpDir, 100*time.Millisecond, spyExecutor, spyMetrics)
+		r, err := git.NewRepo("some-path", tmpDir, 100*time.Millisecond, spyExecutor, spyMetrics)
 		Expect(t, err).To(BeNil())
 
 		return TR{
@@ -147,7 +147,7 @@ func TestRepo(t *testing.T) {
 		Expect(t, os.Mkdir(path.Join(tmpDir, "c29tZS1wYXRo"), os.ModePerm)).To(BeNil())
 		spyExecutor := newSpyExecutor()
 
-		_, err = gitwatcher.NewRepo("some-path", tmpDir, time.Millisecond, spyExecutor, t.spyMetrics)
+		_, err = git.NewRepo("some-path", tmpDir, time.Millisecond, spyExecutor, t.spyMetrics)
 		Expect(t, err).To(BeNil())
 
 		Expect(t, spyExecutor.Commands()).To(Not(Contain([]string{
@@ -160,7 +160,7 @@ func TestRepo(t *testing.T) {
 		spyExecutor.errs = []error{errors.New("some-error")}
 		spyExecutor.results = [][]string{nil}
 
-		_, err := gitwatcher.NewRepo("some-path", t.tmpDir, time.Millisecond, spyExecutor, t.spyMetrics)
+		_, err := git.NewRepo("some-path", t.tmpDir, time.Millisecond, spyExecutor, t.spyMetrics)
 		Expect(t, err).To(Not(BeNil()))
 	})
 

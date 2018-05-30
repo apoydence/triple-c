@@ -1,4 +1,4 @@
-package gitwatcher_test
+package git_test
 
 import (
 	"errors"
@@ -8,12 +8,12 @@ import (
 	"github.com/apoydence/onpar"
 	. "github.com/apoydence/onpar/expect"
 	. "github.com/apoydence/onpar/matchers"
-	"github.com/apoydence/triple-c/internal/gitwatcher"
+	"github.com/apoydence/triple-c/internal/git"
 )
 
 type TRR struct {
 	*testing.T
-	r           *gitwatcher.RepoRegistry
+	r           *git.RepoRegistry
 	spyExecutor *spyExecutor
 }
 
@@ -31,7 +31,7 @@ func TestRepoRegistry(t *testing.T) {
 		return TRR{
 			T:           t,
 			spyExecutor: spyExecutor,
-			r:           gitwatcher.NewRepoRegistry(tmpDir, spyExecutor, newSpyMetrics()),
+			r:           git.NewRepoRegistry(tmpDir, spyExecutor, newSpyMetrics()),
 		}
 	})
 

@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/apoydence/triple-c/internal/capi"
-	"github.com/apoydence/triple-c/internal/gitwatcher"
+	"github.com/apoydence/triple-c/internal/git"
 	"github.com/apoydence/triple-c/internal/metrics"
 	"github.com/apoydence/triple-c/internal/scheduler"
 	"github.com/bradylove/envstruct"
@@ -64,7 +64,7 @@ func main() {
 	}
 	log.Printf("temp dir is at: %s", tmpDir)
 
-	execer := gitwatcher.ExecutorFunc(func(path string, commands ...string) ([]string, error) {
+	execer := git.ExecutorFunc(func(path string, commands ...string) ([]string, error) {
 		cmd := exec.Command(commands[0], commands[1:]...)
 		cmd.Dir = path
 		cmd.Env = []string{"GIT_TERMINAL_PROMPT=0"}
@@ -87,7 +87,7 @@ func main() {
 		return lines, nil
 	})
 
-	repoRegistry := gitwatcher.NewRepoRegistry(tmpDir, execer, m)
+	repoRegistry := git.NewRepoRegistry(tmpDir, execer, m)
 	configRepo, err := repoRegistry.FetchRepo(cfg.RepoPath)
 	if err != nil {
 		log.Fatalf("failed to get config repo (%s): %s", cfg.RepoPath, err)
@@ -101,7 +101,7 @@ func main() {
 				cfg.VcapApplication.ApplicationID,
 				branch,
 				capi,
-				gitwatcher.StartWatcher,
+				git.StartWatcher,
 				repoRegistry,
 				m,
 				log,
@@ -110,7 +110,7 @@ func main() {
 
 			successfulConfig := m.NewCounter("SuccesssfulConifig")
 			failConfig := m.NewCounter("FailedConifig")
-			gitwatcher.StartWatcher(
+			git.StartWatcher(
 				ctx,
 				branch,
 				func(sha string) {
@@ -135,7 +135,7 @@ func main() {
 	branchManager := scheduler.NewBranchManager(startBranch)
 	branchSched := scheduler.NewBranchScheduler(branchManager)
 
-	gitwatcher.StartBranchWatcher(
+	git.StartBranchWatcher(
 		context.Background(),
 		configRepo,
 		func(branches []string) {
@@ -149,7 +149,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), nil))
 }
 
-func fetchConfigFile(SHA, filePath string, repo *gitwatcher.Repo, fail, succ func(uint64), log *log.Logger) scheduler.Tasks {
+func fetchConfigFile(SHA, filePath string, repo *git.Repo, fail, succ func(uint64), log *log.Logger) scheduler.Tasks {
 	data, err := repo.File(SHA, filePath)
 	if err != nil {
 		log.Printf("failed to find config file: %s", err)

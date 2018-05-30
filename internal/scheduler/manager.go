@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/apoydence/triple-c/internal/gitwatcher"
+	"github.com/apoydence/triple-c/internal/git"
 )
 
 type Manager struct {
@@ -34,8 +34,8 @@ type GitWatcher func(
 	branch string,
 	commit func(SHA string),
 	interval time.Duration,
-	shaFetcher gitwatcher.SHAFetcher,
-	m gitwatcher.Metrics,
+	shaFetcher git.SHAFetcher,
+	m git.Metrics,
 	log *log.Logger,
 )
 
@@ -52,7 +52,7 @@ type Metrics interface {
 }
 
 type RepoRegistry interface {
-	FetchRepo(path string) (*gitwatcher.Repo, error)
+	FetchRepo(path string) (*git.Repo, error)
 }
 
 func NewManager(

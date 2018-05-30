@@ -12,7 +12,7 @@ import (
 	"github.com/apoydence/onpar"
 	. "github.com/apoydence/onpar/expect"
 	. "github.com/apoydence/onpar/matchers"
-	"github.com/apoydence/triple-c/internal/gitwatcher"
+	"github.com/apoydence/triple-c/internal/git"
 	"github.com/apoydence/triple-c/internal/scheduler"
 )
 
@@ -154,8 +154,8 @@ type spyGitWatcher struct {
 	branch     string
 	commit     func(SHA string)
 	interval   time.Duration
-	shaFetcher gitwatcher.SHAFetcher
-	m          gitwatcher.Metrics
+	shaFetcher git.SHAFetcher
+	m          git.Metrics
 	log        *log.Logger
 }
 
@@ -168,8 +168,8 @@ func (s *spyGitWatcher) StartWatcher(
 	branch string,
 	commit func(SHA string),
 	interval time.Duration,
-	shaFetcher gitwatcher.SHAFetcher,
-	m gitwatcher.Metrics,
+	shaFetcher git.SHAFetcher,
+	m git.Metrics,
 	log *log.Logger,
 ) {
 	s.ctx = ctx
@@ -211,7 +211,7 @@ func (s *spyMetrics) GetDelta(name string) func() uint64 {
 type spyRepoRegistry struct {
 	path string
 
-	repo *gitwatcher.Repo
+	repo *git.Repo
 	err  error
 }
 
@@ -219,7 +219,7 @@ func newSpyRepoRegistry() *spyRepoRegistry {
 	return &spyRepoRegistry{}
 }
 
-func (s *spyRepoRegistry) FetchRepo(path string) (*gitwatcher.Repo, error) {
+func (s *spyRepoRegistry) FetchRepo(path string) (*git.Repo, error) {
 	s.path = path
 	return s.repo, s.err
 }

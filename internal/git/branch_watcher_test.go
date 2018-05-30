@@ -1,4 +1,4 @@
-package gitwatcher_test
+package git_test
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/apoydence/onpar"
 	. "github.com/apoydence/onpar/expect"
 	. "github.com/apoydence/onpar/matchers"
-	"github.com/apoydence/triple-c/internal/gitwatcher"
+	"github.com/apoydence/triple-c/internal/git"
 )
 
 type TB struct {
@@ -89,7 +89,7 @@ func TestBranchWatcher(t *testing.T) {
 }
 
 func startBranchWalkerWithContext(ctx context.Context, t *TB) {
-	gitwatcher.StartBranchWatcher(
+	git.StartBranchWatcher(
 		ctx,
 		t.spyBranchLister,
 		func(branches []string) {
@@ -104,7 +104,7 @@ func startBranchWalkerWithContext(ctx context.Context, t *TB) {
 }
 
 func startBranchWalker(t *TB) {
-	gitwatcher.StartBranchWatcher(
+	git.StartBranchWatcher(
 		context.Background(),
 		t.spyBranchLister,
 		func(branches []string) {

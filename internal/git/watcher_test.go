@@ -1,4 +1,4 @@
-package gitwatcher_test
+package git_test
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/apoydence/onpar"
 	. "github.com/apoydence/onpar/expect"
 	. "github.com/apoydence/onpar/matchers"
-	"github.com/apoydence/triple-c/internal/gitwatcher"
+	"github.com/apoydence/triple-c/internal/git"
 )
 
 type TW struct {
@@ -82,7 +82,7 @@ func TestWatcher(t *testing.T) {
 }
 
 func startWatcherWithContext(ctx context.Context, t *TW) {
-	gitwatcher.StartWatcher(
+	git.StartWatcher(
 		ctx,
 		"some-branch",
 		func(sha string) {
@@ -98,7 +98,7 @@ func startWatcherWithContext(ctx context.Context, t *TW) {
 }
 
 func startWatcher(t *TW) {
-	gitwatcher.StartWatcher(
+	git.StartWatcher(
 		context.Background(),
 		"some-branch",
 		func(sha string) {

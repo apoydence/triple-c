@@ -1,4 +1,4 @@
-package gitwatcher
+package git
 
 import (
 	"sync"
