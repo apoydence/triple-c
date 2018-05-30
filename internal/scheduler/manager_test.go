@@ -2,6 +2,8 @@ package scheduler_test
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"log"
@@ -65,11 +67,37 @@ func TestManager(t *testing.T) {
 		Expect(t, t.spyGitWatcher.branch).To(Equal("some-branch"))
 		t.spyGitWatcher.commit("some-sha")
 		Expect(t, t.spyTaskCreator.command).To(ContainSubstring("some-command"))
-		Expect(t, t.spyTaskCreator.name).To(Not(Equal("")))
 		Expect(t, t.spyTaskCreator.appGuid).To(Equal("some-guid"))
+
+		dataName, err := base64.StdEncoding.DecodeString(t.spyTaskCreator.name)
+		Expect(t, err).To(BeNil())
+
+		var m map[string]interface{}
+		Expect(t, json.Unmarshal(dataName, &m)).To(BeNil())
+		Expect(t, m["sha"]).To(Equal("some-sha"))
 
 		Expect(t, t.spyMetrics.GetDelta("SuccessfulTasks")()).To(Equal(uint64(1)))
 		Expect(t, t.spyMetrics.GetDelta("FailedTasks")()).To(Equal(uint64(0)))
+	})
+
+	o.Spec("it does not start a task when a commit comes through but there is a task for it already", func(t TM) {
+		t.m.Add(scheduler.Task{
+			RepoPath: "some-path",
+			Command:  "some-command",
+		})
+
+		t.spyTaskCreator.listResults = []string{
+			base64.StdEncoding.EncodeToString([]byte(`{"sha":"some-sha"}`)),
+			"some-other-name",
+		}
+
+		Expect(t, t.spyGitWatcher.commit).To(Not(BeNil()))
+		Expect(t, t.spyGitWatcher.branch).To(Equal("some-branch"))
+		t.spyGitWatcher.commit("some-sha")
+
+		Expect(t, t.spyTaskCreator.called).To(Equal(0))
+
+		Expect(t, t.spyMetrics.GetDelta("DedupedTasks")()).To(Equal(uint64(1)))
 	})
 
 	o.Spec("it increments FailedTasks when a task fails", func(t TM) {
@@ -130,6 +158,10 @@ type spyTaskCreator struct {
 	appGuid string
 
 	err error
+
+	listAppGuid string
+	listResults []string
+	listErr     error
 }
 
 func newSpyTaskCreator() *spyTaskCreator {
@@ -147,6 +179,11 @@ func (s *spyTaskCreator) CreateTask(
 	s.appGuid = appGuid
 
 	return s.err
+}
+
+func (s *spyTaskCreator) ListTasks(appGuid string) ([]string, error) {
+	s.listAppGuid = appGuid
+	return s.listResults, s.listErr
 }
 
 type spyGitWatcher struct {
