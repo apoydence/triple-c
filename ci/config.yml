@@ -12,4 +12,4 @@ tasks:
   command: |
     set -ex
 
-    echo "hi 3"
+    echo "hi 4"
