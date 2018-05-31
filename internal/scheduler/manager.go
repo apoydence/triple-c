@@ -122,14 +122,14 @@ func (m *Manager) Add(t MetaTask) {
 				return
 			}
 
-			dupe, err := m.duplicate(SHA)
+			dupe, err := m.duplicate(m.branch, SHA)
 			if err != nil {
 				m.log.Printf("failed deduping tasks: %s", err)
 				return
 			}
 
 			if dupe {
-				m.log.Printf("skipping task for %s", SHA)
+				m.log.Printf("skipping task for %s on branch %s", SHA, m.branch)
 				m.dedupedTasks(1)
 				return
 			}
@@ -138,12 +138,14 @@ func (m *Manager) Add(t MetaTask) {
 			defer m.log.Printf("done with task for %s", SHA)
 
 			name, err := json.Marshal(struct {
-				SHA string `json:"sha"`
+				SHA    string `json:"sha"`
+				Branch string `json:"branch"`
 			}{
-				SHA: SHA,
+				SHA:    SHA,
+				Branch: m.branch,
 			})
 			if err != nil {
-				log.Print(err)
+				m.log.Printf("failed to marshal task name: %s", err)
 				return
 			}
 
@@ -167,7 +169,7 @@ func (m *Manager) Add(t MetaTask) {
 	)
 }
 
-func (m *Manager) duplicate(SHA string) (bool, error) {
+func (m *Manager) duplicate(branch, SHA string) (bool, error) {
 	tasks, err := m.taskCreator.ListTasks(m.appGuid)
 	if err != nil {
 		return false, err
@@ -180,13 +182,14 @@ func (m *Manager) duplicate(SHA string) (bool, error) {
 		}
 
 		var taskMeta struct {
-			SHA string `json:"sha"`
+			SHA    string `json:"sha"`
+			Branch string `json:"branch"`
 		}
 		if err := json.Unmarshal(data, &taskMeta); err != nil {
 			continue
 		}
 
-		if taskMeta.SHA == SHA {
+		if taskMeta.Branch == branch && taskMeta.SHA == SHA {
 			return true, nil
 		}
 	}

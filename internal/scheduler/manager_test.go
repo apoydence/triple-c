@@ -83,6 +83,7 @@ func TestManager(t *testing.T) {
 		var m map[string]interface{}
 		Expect(t, json.Unmarshal(dataName, &m)).To(BeNil())
 		Expect(t, m["sha"]).To(Equal("some-sha"))
+		Expect(t, m["branch"]).To(Equal("some-branch"))
 
 		Expect(t, t.spyMetrics.GetDelta("SuccessfulTasks")()).To(Equal(uint64(1)))
 		Expect(t, t.spyMetrics.GetDelta("FailedTasks")()).To(Equal(uint64(0)))
@@ -158,7 +159,7 @@ func TestManager(t *testing.T) {
 		})
 
 		t.spyTaskCreator.listResults = []string{
-			base64.StdEncoding.EncodeToString([]byte(`{"sha":"some-sha"}`)),
+			base64.StdEncoding.EncodeToString([]byte(`{"sha":"some-sha","branch":"some-branch"}`)),
 			"some-other-name",
 		}
 
@@ -167,8 +168,27 @@ func TestManager(t *testing.T) {
 		t.spyGitWatcher.commit("some-sha")
 
 		Expect(t, t.spyTaskCreator.called).To(Equal(0))
-
 		Expect(t, t.spyMetrics.GetDelta("DedupedTasks")()).To(Equal(uint64(1)))
+	})
+
+	o.Spec("it does not dedupe commits on different branches", func(t TM) {
+		t.m.Add(scheduler.MetaTask{
+			Task: scheduler.Task{
+				RepoPath: "some-path",
+				Command:  "some-command",
+			},
+		})
+
+		t.spyTaskCreator.listResults = []string{
+			base64.StdEncoding.EncodeToString([]byte(`{"sha":"some-sha","branch":"other-branch"}`)),
+		}
+
+		Expect(t, t.spyGitWatcher.commit).To(Not(BeNil()))
+		Expect(t, t.spyGitWatcher.branch).To(Equal("some-branch"))
+		t.spyGitWatcher.commit("some-sha")
+
+		Expect(t, t.spyTaskCreator.called).To(Equal(1))
+		Expect(t, t.spyMetrics.GetDelta("DedupedTasks")()).To(Equal(uint64(0)))
 	})
 
 	o.Spec("it increments FailedTasks when a task fails", func(t TM) {
