@@ -13,11 +13,11 @@ import (
 	"os/exec"
 	"time"
 
+	envstruct "code.cloudfoundry.org/go-envstruct"
 	"github.com/apoydence/triple-c/internal/capi"
 	"github.com/apoydence/triple-c/internal/git"
 	"github.com/apoydence/triple-c/internal/metrics"
 	"github.com/apoydence/triple-c/internal/scheduler"
-	"github.com/bradylove/envstruct"
 	"github.com/cloudfoundry-incubator/uaago"
 	"gopkg.in/yaml.v2"
 )
