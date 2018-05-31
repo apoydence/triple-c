@@ -103,6 +103,7 @@ func main() {
 				capi,
 				git.StartWatcher,
 				repoRegistry,
+				os.LookupEnv,
 				m,
 				log,
 			)

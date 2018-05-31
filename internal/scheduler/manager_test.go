@@ -51,6 +51,12 @@ func TestManager(t *testing.T) {
 				spyTaskCreator,
 				spyGitWatcher.StartWatcher,
 				spyRepoRegistry,
+				func(key string) (string, bool) {
+					if key == "KNOWN_KEY" {
+						return "KNOWN_VALUE", true
+					}
+					return "", false
+				},
 				spyMetrics,
 				log.New(ioutil.Discard, "", 0),
 			),
@@ -78,6 +84,31 @@ func TestManager(t *testing.T) {
 
 		Expect(t, t.spyMetrics.GetDelta("SuccessfulTasks")()).To(Equal(uint64(1)))
 		Expect(t, t.spyMetrics.GetDelta("FailedTasks")()).To(Equal(uint64(0)))
+	})
+
+	o.Spec("it sets the given environment variables", func(t TM) {
+		t.m.Add(scheduler.Task{
+			RepoPath: "some-path",
+			Command:  "some-command",
+			Parameters: map[string]string{
+				"SOME_VAR":       "some-value",
+				"SOME_OTHER_VAR": "some-other-value",
+				"LOOKUP":         "((KNOWN_KEY))",
+				"DONT_LOOKUP":    "((UNKNOWN_KEY))",
+			},
+		})
+
+		Expect(t, t.spyGitWatcher.commit).To(Not(BeNil()))
+		Expect(t, t.spyGitWatcher.branch).To(Equal("some-branch"))
+		t.spyGitWatcher.commit("some-sha")
+		Expect(t, t.spyTaskCreator.command).To(
+			And(
+				ContainSubstring("export SOME_VAR=some-value"),
+				ContainSubstring("export SOME_OTHER_VAR=some-other-value"),
+				ContainSubstring("export LOOKUP=KNOWN_VALUE"),
+				Not(ContainSubstring("DONT_LOOKUP")),
+			),
+		)
 	})
 
 	o.Spec("it does not start a task when a commit comes through but there is a task for it already", func(t TM) {

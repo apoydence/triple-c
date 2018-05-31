@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"path"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,6 +24,7 @@ type Manager struct {
 	dedupedTasks    func(delta uint64)
 	appGuid         string
 	branch          string
+	ps              ParameterStore
 
 	taskCreator TaskCreator
 
@@ -29,7 +32,7 @@ type Manager struct {
 	repoRegistry RepoRegistry
 
 	mu   sync.Mutex
-	ctxs map[Task]func()
+	ctxs map[encodedTask]func()
 }
 
 type GitWatcher func(
@@ -52,6 +55,8 @@ type TaskCreator interface {
 	ListTasks(appGuid string) ([]string, error)
 }
 
+type ParameterStore func(key string) (string, bool)
+
 type Metrics interface {
 	NewCounter(name string) func(delta uint64)
 }
@@ -67,6 +72,7 @@ func NewManager(
 	tc TaskCreator,
 	w GitWatcher,
 	repoRegistry RepoRegistry,
+	ps ParameterStore,
 	m Metrics,
 	log *log.Logger,
 ) *Manager {
@@ -83,6 +89,7 @@ func NewManager(
 		appGuid:      appGuid,
 		branch:       branch,
 		m:            m,
+		ps:           ps,
 
 		taskCreator: tc,
 
@@ -91,14 +98,14 @@ func NewManager(
 		failedRepos:     failedRepos,
 		dedupedTasks:    dedupedTasks,
 
-		ctxs: make(map[Task]func()),
+		ctxs: make(map[encodedTask]func()),
 	}
 }
 
 func (m *Manager) Add(t Task) {
 	m.log.Printf("Adding task: %+v", t)
 	ctx, cancel := context.WithCancel(context.Background())
-	m.ctxs[t] = cancel
+	m.ctxs[encodeTask(t)] = cancel
 
 	repo, err := m.repoRegistry.FetchRepo(t.RepoPath)
 	if err != nil {
@@ -112,7 +119,7 @@ func (m *Manager) Add(t Task) {
 		m.branch,
 		func(SHA string) {
 			m.mu.Lock()
-			_, ok := m.ctxs[t]
+			_, ok := m.ctxs[encodeTask(t)]
 			m.mu.Unlock()
 			if !ok {
 				return
@@ -144,7 +151,7 @@ func (m *Manager) Add(t Task) {
 			}
 
 			err = m.taskCreator.CreateTask(
-				m.fetchRepo(t.RepoPath, t.Command, m.branch),
+				m.fetchRepo(t, m.branch, m.ps),
 				base64.StdEncoding.EncodeToString(name),
 				m.appGuid,
 			)
@@ -193,17 +200,45 @@ func (m *Manager) duplicate(SHA string) (bool, error) {
 func (m *Manager) Remove(t Task) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	cancel, ok := m.ctxs[t]
+	cancel, ok := m.ctxs[encodeTask(t)]
 	if !ok {
 		return
 	}
 
-	delete(m.ctxs, t)
+	delete(m.ctxs, encodeTask(t))
 	cancel()
 }
 
+type encodedTask string
+
+func encodeTask(t Task) encodedTask {
+	parameters := []string{
+		t.RepoPath,
+		t.Command,
+	}
+	for k, v := range t.Parameters {
+		parameters = append(parameters, fmt.Sprintf("%s=%s", k, v))
+	}
+	sort.Strings(parameters)
+
+	return encodedTask(strings.Join(parameters, ","))
+}
+
 // fetchRepo adds the cloning of a repo to the given command
-func (m *Manager) fetchRepo(repoPath, command, branch string) string {
+func (m *Manager) fetchRepo(t Task, branch string, ps ParameterStore) string {
+	var parameters string
+	for k, v := range t.Parameters {
+		if !strings.HasPrefix(v, "((") || !strings.HasSuffix(v, "))") {
+			parameters = fmt.Sprintf("%sexport %s=%s\n", parameters, k, v)
+			continue
+		}
+
+		if v, ok := ps(v[2 : len(v)-2]); ok {
+			parameters = fmt.Sprintf("%sexport %s=%s\n", parameters, k, v)
+			continue
+		}
+	}
+
 	return fmt.Sprintf(`#!/bin/bash
 set -ex
 
@@ -214,6 +249,9 @@ git clone %s
 # If checking out fails, its fine. Move forward with the default branch.
 set +e
 
+# Parameters
+%s
+
 pushd %s
   git checkout %s
   git submodule update --init --recursive
@@ -223,10 +261,11 @@ set +x
 
 %s
 	`,
-		path.Base(repoPath),
-		repoPath,
-		path.Base(repoPath),
+		path.Base(t.RepoPath),
+		t.RepoPath,
+		parameters,
+		path.Base(t.RepoPath),
 		branch,
-		command,
+		t.Command,
 	)
 }

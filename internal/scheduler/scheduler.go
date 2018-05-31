@@ -11,8 +11,9 @@ type Tasks struct {
 }
 
 type Task struct {
-	RepoPath string `yaml:"repo_path"`
-	Command  string `yaml:"command"`
+	RepoPath   string            `yaml:"repo_path"`
+	Command    string            `yaml:"command"`
+	Parameters map[string]string `yaml:"parameters"`
 }
 
 type TaskManager interface {
@@ -49,8 +50,9 @@ func (s *Scheduler) SetTasks(ts []Task) {
 }
 
 func (s *Scheduler) findTask(t Task, ts []Task) bool {
+	et := encodeTask(t)
 	for _, tt := range ts {
-		if tt == t {
+		if encodeTask(tt) == et {
 			return true
 		}
 	}
