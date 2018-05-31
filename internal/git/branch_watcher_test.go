@@ -83,8 +83,8 @@ func TestBranchWatcher(t *testing.T) {
 
 		startBranchWalker(t)
 
-		Expect(t, t.spyMetrics.GetDelta("GithubErrs")).To(ViaPolling(Equal(uint64(1))))
-		Expect(t, t.spyMetrics.GetDelta("GithubReads")()).To(Not(Equal(uint64(0))))
+		Expect(t, t.spyMetrics.GetDelta("GitBranchErrs")).To(ViaPolling(Equal(uint64(1))))
+		Expect(t, t.spyMetrics.GetDelta("GitBranchReads")()).To(Not(Equal(uint64(0))))
 	})
 }
 

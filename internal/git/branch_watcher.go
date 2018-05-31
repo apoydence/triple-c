@@ -11,9 +11,9 @@ type BranchWatcher struct {
 	callback func(branches []string)
 	backoff  time.Duration
 
-	githubReads func(delta uint64)
-	githubErrs  func(delta uint64)
-	log         *log.Logger
+	gitReads func(delta uint64)
+	gitErrs  func(delta uint64)
+	log      *log.Logger
 }
 
 type BranchLister interface {
@@ -34,8 +34,8 @@ func StartBranchWatcher(
 		log:      log,
 		backoff:  backoff,
 
-		githubReads: m.NewCounter("GithubReads"),
-		githubErrs:  m.NewCounter("GithubErrs"),
+		gitReads: m.NewCounter("GitBranchReads"),
+		gitErrs:  m.NewCounter("GitBranchErrs"),
 	}
 
 	go w.start(ctx)
@@ -52,13 +52,13 @@ func (w *BranchWatcher) start(ctx context.Context) {
 
 func (w *BranchWatcher) readFromGit() {
 	defer time.Sleep(w.backoff)
-	w.githubReads(1)
+	w.gitReads(1)
 
 	branches, err := w.lister.ListBranches()
 
 	if err != nil {
-		w.log.Printf("failed to read branches from github: %s", err)
-		w.githubErrs(1)
+		w.log.Printf("failed to read branches: %s", err)
+		w.gitErrs(1)
 		return
 	}
 
