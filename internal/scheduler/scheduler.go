@@ -3,11 +3,16 @@ package scheduler
 type Scheduler struct {
 	m TaskManager
 
-	currentTasks []Task
+	currentTasks []MetaTask
 }
 
 type Tasks struct {
 	Tasks []Task `yaml:"tasks"`
+}
+
+type MetaTask struct {
+	Task
+	DoOnce bool
 }
 
 type Task struct {
@@ -17,8 +22,8 @@ type Task struct {
 }
 
 type TaskManager interface {
-	Add(t Task)
-	Remove(t Task)
+	Add(t MetaTask)
+	Remove(t MetaTask)
 }
 
 func New(m TaskManager) *Scheduler {
@@ -27,8 +32,8 @@ func New(m TaskManager) *Scheduler {
 	}
 }
 
-func (s *Scheduler) SetTasks(ts []Task) {
-	var newCurrent []Task
+func (s *Scheduler) SetTasks(ts []MetaTask) {
+	var newCurrent []MetaTask
 	defer func() {
 		s.currentTasks = newCurrent
 	}()
@@ -49,7 +54,7 @@ func (s *Scheduler) SetTasks(ts []Task) {
 	}
 }
 
-func (s *Scheduler) findTask(t Task, ts []Task) bool {
+func (s *Scheduler) findTask(t MetaTask, ts []MetaTask) bool {
 	et := encodeTask(t)
 	for _, tt := range ts {
 		if encodeTask(tt) == et {

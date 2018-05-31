@@ -115,13 +115,16 @@ func main() {
 				ctx,
 				branch,
 				func(sha string) {
-					var ts []scheduler.Task
+					var ts []scheduler.MetaTask
 					for _, t := range fetchConfigFile(sha, cfg.ConfigPath, configRepo, failConfig, successfulConfig, log).Tasks {
 						if t.Command == "" || t.RepoPath == "" {
 							log.Printf("invalid task: %+v", t)
 							continue
 						}
-						ts = append(ts, t)
+						ts = append(ts, scheduler.MetaTask{
+							Task:   t,
+							DoOnce: t.RepoPath == cfg.RepoPath,
+						})
 					}
 					sched.SetTasks(ts)
 				},

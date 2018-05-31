@@ -31,95 +31,95 @@ func TestScheduler(t *testing.T) {
 	})
 
 	o.Spec("it adds new tasks to the manager", func(t TS) {
-		t.s.SetTasks([]scheduler.Task{
+		t.s.SetTasks([]scheduler.MetaTask{
 			{
-				RepoPath: "a",
+				Task: scheduler.Task{RepoPath: "a"},
 			},
 			{
-				RepoPath: "b",
+				Task: scheduler.Task{RepoPath: "b"},
 			},
 		})
 
 		Expect(t, t.spyTaskManager.adds).To(HaveLen(2))
 		Expect(t, t.spyTaskManager.adds).To(Contain(
-			scheduler.Task{RepoPath: "a"},
-			scheduler.Task{RepoPath: "b"},
+			scheduler.MetaTask{Task: scheduler.Task{RepoPath: "a"}},
+			scheduler.MetaTask{Task: scheduler.Task{RepoPath: "b"}},
 		))
 	})
 
 	o.Spec("it does not add the same task twice", func(t TS) {
-		t.s.SetTasks([]scheduler.Task{
+		t.s.SetTasks([]scheduler.MetaTask{
 			{
-				RepoPath: "a",
+				Task: scheduler.Task{RepoPath: "a"},
 			},
 		})
-		t.s.SetTasks([]scheduler.Task{
+		t.s.SetTasks([]scheduler.MetaTask{
 			{
-				RepoPath: "a",
+				Task: scheduler.Task{RepoPath: "a"},
 			},
 		})
 
 		Expect(t, t.spyTaskManager.adds).To(HaveLen(1))
 		Expect(t, t.spyTaskManager.adds).To(Contain(
-			scheduler.Task{RepoPath: "a"},
+			scheduler.MetaTask{Task: scheduler.Task{RepoPath: "a"}},
 		))
 	})
 
 	o.Spec("it removes stale tasks", func(t TS) {
-		t.s.SetTasks([]scheduler.Task{
+		t.s.SetTasks([]scheduler.MetaTask{
 			{
-				RepoPath: "a",
+				Task: scheduler.Task{RepoPath: "a"},
 			},
 		})
-		t.s.SetTasks([]scheduler.Task{
+		t.s.SetTasks([]scheduler.MetaTask{
 			{
-				RepoPath: "b",
+				Task: scheduler.Task{RepoPath: "b"},
 			},
 		})
 
 		Expect(t, t.spyTaskManager.removes).To(HaveLen(1))
 		Expect(t, t.spyTaskManager.removes).To(Contain(
-			scheduler.Task{RepoPath: "a"},
+			scheduler.MetaTask{Task: scheduler.Task{RepoPath: "a"}},
 		))
 	})
 }
 
 type spyTaskManager struct {
 	mu      sync.Mutex
-	adds    []scheduler.Task
-	removes []scheduler.Task
+	adds    []scheduler.MetaTask
+	removes []scheduler.MetaTask
 }
 
 func newSpyTaskManager() *spyTaskManager {
 	return &spyTaskManager{}
 }
 
-func (s *spyTaskManager) Add(t scheduler.Task) {
+func (s *spyTaskManager) Add(t scheduler.MetaTask) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.adds = append(s.adds, t)
 }
 
-func (s *spyTaskManager) Remove(t scheduler.Task) {
+func (s *spyTaskManager) Remove(t scheduler.MetaTask) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.removes = append(s.removes, t)
 }
 
-func (s *spyTaskManager) Adds() []scheduler.Task {
+func (s *spyTaskManager) Adds() []scheduler.MetaTask {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	r := make([]scheduler.Task, len(s.adds))
+	r := make([]scheduler.MetaTask, len(s.adds))
 	copy(r, s.adds)
 	return r
 }
 
-func (s *spyTaskManager) Removes() []scheduler.Task {
+func (s *spyTaskManager) Removes() []scheduler.MetaTask {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	r := make([]scheduler.Task, len(s.removes))
+	r := make([]scheduler.MetaTask, len(s.removes))
 	copy(r, s.removes)
 	return r
 }

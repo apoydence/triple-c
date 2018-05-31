@@ -102,7 +102,7 @@ func NewManager(
 	}
 }
 
-func (m *Manager) Add(t Task) {
+func (m *Manager) Add(t MetaTask) {
 	m.log.Printf("Adding task: %+v", t)
 	ctx, cancel := context.WithCancel(context.Background())
 	m.ctxs[encodeTask(t)] = cancel
@@ -118,10 +118,7 @@ func (m *Manager) Add(t Task) {
 		ctx,
 		m.branch,
 		func(SHA string) {
-			m.mu.Lock()
-			_, ok := m.ctxs[encodeTask(t)]
-			m.mu.Unlock()
-			if !ok {
+			if !m.checkAndRemove(t, t.DoOnce) {
 				return
 			}
 
@@ -151,7 +148,7 @@ func (m *Manager) Add(t Task) {
 			}
 
 			err = m.taskCreator.CreateTask(
-				m.fetchRepo(t, m.branch, m.ps),
+				m.fetchRepo(t.Task, m.branch, m.ps),
 				base64.StdEncoding.EncodeToString(name),
 				m.appGuid,
 			)
@@ -197,21 +194,31 @@ func (m *Manager) duplicate(SHA string) (bool, error) {
 	return false, nil
 }
 
-func (m *Manager) Remove(t Task) {
+func (m *Manager) Remove(t MetaTask) {
+	m.checkAndRemove(t, true)
+}
+
+func (m *Manager) checkAndRemove(t MetaTask, remove bool) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	cancel, ok := m.ctxs[encodeTask(t)]
 	if !ok {
-		return
+		return false
+	}
+
+	if !remove {
+		return true
 	}
 
 	delete(m.ctxs, encodeTask(t))
 	cancel()
+
+	return true
 }
 
 type encodedTask string
 
-func encodeTask(t Task) encodedTask {
+func encodeTask(t MetaTask) encodedTask {
 	parameters := []string{
 		t.RepoPath,
 		t.Command,

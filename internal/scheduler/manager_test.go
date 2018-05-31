@@ -64,9 +64,11 @@ func TestManager(t *testing.T) {
 	})
 
 	o.Spec("it starts a task when a commit comes through", func(t TM) {
-		t.m.Add(scheduler.Task{
-			RepoPath: "some-path",
-			Command:  "some-command",
+		t.m.Add(scheduler.MetaTask{
+			Task: scheduler.Task{
+				RepoPath: "some-path",
+				Command:  "some-command",
+			},
 		})
 
 		Expect(t, t.spyGitWatcher.commit).To(Not(BeNil()))
@@ -86,15 +88,51 @@ func TestManager(t *testing.T) {
 		Expect(t, t.spyMetrics.GetDelta("FailedTasks")()).To(Equal(uint64(0)))
 	})
 
+	o.Spec("it starts a task once if the DoOnce is set", func(t TM) {
+		t.m.Add(scheduler.MetaTask{
+			Task: scheduler.Task{
+				RepoPath: "some-path",
+				Command:  "some-command",
+			},
+			DoOnce: true,
+		})
+
+		Expect(t, t.spyGitWatcher.commit).To(Not(BeNil()))
+		Expect(t, t.spyGitWatcher.branch).To(Equal("some-branch"))
+		t.spyGitWatcher.commit("some-sha")
+		t.spyGitWatcher.commit("some-other-sha")
+
+		Expect(t, t.spyMetrics.GetDelta("SuccessfulTasks")()).To(Equal(uint64(1)))
+	})
+
+	o.Spec("it starts a task multiple times if the DoOnce is not set", func(t TM) {
+		t.m.Add(scheduler.MetaTask{
+			Task: scheduler.Task{
+				RepoPath: "some-path",
+				Command:  "some-command",
+			},
+			DoOnce: false,
+		})
+
+		Expect(t, t.spyGitWatcher.commit).To(Not(BeNil()))
+		Expect(t, t.spyGitWatcher.branch).To(Equal("some-branch"))
+		t.spyGitWatcher.commit("some-sha")
+		t.spyGitWatcher.commit("some-other-sha")
+
+		Expect(t, t.spyMetrics.GetDelta("SuccessfulTasks")()).To(Equal(uint64(2)))
+	})
+
 	o.Spec("it sets the given environment variables", func(t TM) {
-		t.m.Add(scheduler.Task{
-			RepoPath: "some-path",
-			Command:  "some-command",
-			Parameters: map[string]string{
-				"SOME_VAR":       "some-value",
-				"SOME_OTHER_VAR": "some-other-value",
-				"LOOKUP":         "((KNOWN_KEY))",
-				"DONT_LOOKUP":    "((UNKNOWN_KEY))",
+		t.m.Add(scheduler.MetaTask{
+			Task: scheduler.Task{
+				RepoPath: "some-path",
+				Command:  "some-command",
+				Parameters: map[string]string{
+					"SOME_VAR":       "some-value",
+					"SOME_OTHER_VAR": "some-other-value",
+					"LOOKUP":         "((KNOWN_KEY))",
+					"DONT_LOOKUP":    "((UNKNOWN_KEY))",
+				},
 			},
 		})
 
@@ -112,9 +150,11 @@ func TestManager(t *testing.T) {
 	})
 
 	o.Spec("it does not start a task when a commit comes through but there is a task for it already", func(t TM) {
-		t.m.Add(scheduler.Task{
-			RepoPath: "some-path",
-			Command:  "some-command",
+		t.m.Add(scheduler.MetaTask{
+			Task: scheduler.Task{
+				RepoPath: "some-path",
+				Command:  "some-command",
+			},
 		})
 
 		t.spyTaskCreator.listResults = []string{
@@ -133,9 +173,11 @@ func TestManager(t *testing.T) {
 
 	o.Spec("it increments FailedTasks when a task fails", func(t TM) {
 		t.spyTaskCreator.err = errors.New("some-error")
-		t.m.Add(scheduler.Task{
-			RepoPath: "some-path",
-			Command:  "some-command",
+		t.m.Add(scheduler.MetaTask{
+			Task: scheduler.Task{
+				RepoPath: "some-path",
+				Command:  "some-command",
+			},
 		})
 		Expect(t, t.spyGitWatcher.commit).To(Not(BeNil()))
 		t.spyGitWatcher.commit("some-sha")
@@ -146,9 +188,11 @@ func TestManager(t *testing.T) {
 
 	o.Spec("it increments FailedRepos when a repo fails to be fetched", func(t TM) {
 		t.spyRepoRegistry.err = errors.New("some-err")
-		t.m.Add(scheduler.Task{
-			RepoPath: "some-path",
-			Command:  "some-command",
+		t.m.Add(scheduler.MetaTask{
+			Task: scheduler.Task{
+				RepoPath: "some-path",
+				Command:  "some-command",
+			},
 		})
 
 		Expect(t, t.spyMetrics.GetDelta("FailedRepos")()).To(Equal(uint64(1)))
@@ -156,14 +200,18 @@ func TestManager(t *testing.T) {
 	})
 
 	o.Spec("it cancels the context when a task is removed", func(t TM) {
-		t.m.Add(scheduler.Task{
-			RepoPath: "some-path",
-			Command:  "some-command",
+		t.m.Add(scheduler.MetaTask{
+			Task: scheduler.Task{
+				RepoPath: "some-path",
+				Command:  "some-command",
+			},
 		})
 
-		t.m.Remove(scheduler.Task{
-			RepoPath: "some-path",
-			Command:  "some-command",
+		t.m.Remove(scheduler.MetaTask{
+			Task: scheduler.Task{
+				RepoPath: "some-path",
+				Command:  "some-command",
+			},
 		})
 
 		Expect(t, t.spyGitWatcher.ctx.Err()).To(Not(BeNil()))
@@ -174,9 +222,11 @@ func TestManager(t *testing.T) {
 
 	o.Spec("it handles removing a task that never was added", func(t TM) {
 		Expect(t, func() {
-			t.m.Remove(scheduler.Task{
-				RepoPath: "some-path",
-				Command:  "some-command",
+			t.m.Remove(scheduler.MetaTask{
+				Task: scheduler.Task{
+					RepoPath: "some-path",
+					Command:  "some-command",
+				},
 			})
 		}).To(Not(Panic()))
 	})
