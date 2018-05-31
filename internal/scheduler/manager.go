@@ -103,6 +103,9 @@ func NewManager(
 }
 
 func (m *Manager) Add(t MetaTask) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	m.log.Printf("Adding task: %+v", t)
 	ctx, cancel := context.WithCancel(context.Background())
 	m.ctxs[encodeTask(t)] = cancel

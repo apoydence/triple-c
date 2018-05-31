@@ -250,6 +250,45 @@ func TestManager(t *testing.T) {
 			})
 		}).To(Not(Panic()))
 	})
+
+	o.Spec("it survives the race detector", func(t TM) {
+		go func() {
+			for i := 0; i < 100; i++ {
+				t.m.Add(scheduler.MetaTask{
+					Task: scheduler.Task{
+						RepoPath: "some-path",
+					},
+				})
+			}
+		}()
+
+		go func() {
+			for i := 0; i < 100; i++ {
+				t.m.Remove(scheduler.MetaTask{
+					Task: scheduler.Task{
+						RepoPath: "some-path",
+					},
+				})
+			}
+		}()
+
+		// We want remove happening on two go routines
+		go func() {
+			for i := 0; i < 100; i++ {
+				t.m.Remove(scheduler.MetaTask{
+					Task: scheduler.Task{
+						RepoPath: "some-path",
+					},
+				})
+			}
+		}()
+
+		t.m.Add(scheduler.MetaTask{
+			Task: scheduler.Task{
+				RepoPath: "some-path",
+			},
+		})
+	})
 }
 
 type spyTaskCreator struct {
