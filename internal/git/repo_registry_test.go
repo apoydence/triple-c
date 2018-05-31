@@ -49,8 +49,9 @@ func TestRepoRegistry(t *testing.T) {
 
 	o.Spec("it returns an error when creating the repo fails", func(t TRR) {
 		t.spyExecutor.SetResults(
-			[][]string{nil},
-			[]error{errors.New("some-error")},
+			"git clone some-path-1 c29tZS1wYXRoLTE",
+			nil,
+			errors.New("some-error"),
 		)
 
 		_, err := t.r.FetchRepo("some-path-1")

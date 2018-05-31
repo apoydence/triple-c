@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -48,8 +49,9 @@ func TestRepo(t *testing.T) {
 
 	o.Spec("it returns the latest SHA", func(t TR) {
 		t.spyExecutor.SetResults(
-			[][]string{{"some-sha"}},
-			[]error{nil},
+			"git rev-parse some-branch",
+			[]string{"some-sha"},
+			nil,
 		)
 
 		sha, err := t.r.SHA("some-branch")
@@ -64,8 +66,9 @@ func TestRepo(t *testing.T) {
 
 	o.Spec("it returns an error if fetching the SHA fails", func(t TR) {
 		t.spyExecutor.SetResults(
-			[][]string{nil},
-			[]error{errors.New("some-error")},
+			"git rev-parse some-branch",
+			nil,
+			errors.New("some-error"),
 		)
 
 		_, err := t.r.SHA("some-branch")
@@ -74,28 +77,20 @@ func TestRepo(t *testing.T) {
 
 	o.Spec("it returns an error if fetching the SHA returns empty results", func(t TR) {
 		t.spyExecutor.SetResults(
-			[][]string{nil},
-			[]error{nil},
+			"git rev-parse some-branch",
+			nil,
+			nil,
 		)
 
 		_, err := t.r.SHA("some-branch")
 		Expect(t, err).To(Not(BeNil()))
 	})
 
-	o.Spec("it returns an error if fetching the file contents fails", func(t TR) {
-		t.spyExecutor.SetResults(
-			[][]string{nil},
-			[]error{errors.New("some-error")},
-		)
-
-		_, err := t.r.File("some-sha", "some-path")
-		Expect(t, err).To(Not(BeNil()))
-	})
-
 	o.Spec("it returns the file contents", func(t TR) {
 		t.spyExecutor.SetResults(
-			[][]string{{"some-contents", "some-other-contents"}},
-			[]error{nil},
+			"git show some-sha:some-path",
+			[]string{"some-contents", "some-other-contents"},
+			nil,
 		)
 
 		sha, err := t.r.File("some-sha", "some-path")
@@ -108,10 +103,26 @@ func TestRepo(t *testing.T) {
 		}))
 	})
 
+	o.Spec("it returns an error if fetching the file contents fails", func(t TR) {
+		t.spyExecutor.SetResults(
+			"git show some-sha:some-path",
+			nil,
+			errors.New("some-error"),
+		)
+
+		_, err := t.r.File("some-sha", "some-path")
+		Expect(t, err).To(Not(BeNil()))
+	})
+
 	o.Spec("it returns the branches", func(t TR) {
 		t.spyExecutor.SetResults(
-			[][]string{{"branch-1", "remotes/origin/HEAD -> origin/master", "     remotes/origin/branch-1", "remotes/origin/branch-2 "}},
-			[]error{nil},
+			"git branch -a",
+			[]string{
+				"branch-1",
+				"remotes/origin/HEAD -> origin/master",
+				"     remotes/origin/branch-1", "remotes/origin/branch-2 ",
+			},
+			nil,
 		)
 
 		branches, err := t.r.ListBranches()
@@ -126,8 +137,9 @@ func TestRepo(t *testing.T) {
 
 	o.Spec("it returns an error if fetching the branches fails", func(t TR) {
 		t.spyExecutor.SetResults(
-			[][]string{nil},
-			[]error{errors.New("some-error")},
+			"git branch -a",
+			nil,
+			errors.New("some-error"),
 		)
 
 		_, err := t.r.ListBranches()
@@ -157,8 +169,11 @@ func TestRepo(t *testing.T) {
 
 	o.Spec("it returns an error when cloning fails", func(t TR) {
 		spyExecutor := newSpyExecutor()
-		spyExecutor.errs = []error{errors.New("some-error")}
-		spyExecutor.results = [][]string{nil}
+		spyExecutor.SetResults(
+			"git clone some-path c29tZS1wYXRo",
+			nil,
+			errors.New("some-error"),
+		)
 
 		_, err := git.NewRepo("some-path", t.tmpDir, time.Millisecond, spyExecutor, t.spyMetrics)
 		Expect(t, err).To(Not(BeNil()))
@@ -175,9 +190,11 @@ func TestRepo(t *testing.T) {
 
 	o.Spec("it reports a failure when fetching", func(t TR) {
 		t.spyExecutor.SetResults(
-			[][]string{nil, nil},
-			[]error{nil, errors.New("some-error")},
+			"git fetch --all",
+			nil,
+			errors.New("some-error"),
 		)
+
 		Expect(t, t.spyExecutor.Paths).To(ViaPolling(Contain(t.tmpDir)))
 		Expect(t, t.spyExecutor.Commands).To(ViaPolling(Contain([]string{
 			"git", "fetch", "--all",
@@ -192,12 +209,19 @@ type spyExecutor struct {
 	commands [][]string
 	paths    []string
 
-	results [][]string
-	errs    []error
+	m map[string]struct {
+		results []string
+		err     error
+	}
 }
 
 func newSpyExecutor() *spyExecutor {
-	return &spyExecutor{}
+	return &spyExecutor{
+		m: make(map[string]struct {
+			results []string
+			err     error
+		}),
+	}
 }
 
 func (s *spyExecutor) Run(path string, commands ...string) ([]string, error) {
@@ -207,26 +231,25 @@ func (s *spyExecutor) Run(path string, commands ...string) ([]string, error) {
 	s.paths = append(s.paths, path)
 	s.commands = append(s.commands, commands)
 
-	if len(s.results) != len(s.errs) {
-		panic("out of sync")
-	}
-
-	if len(s.results) == 0 {
+	results, ok := s.m[strings.Join(commands, " ")]
+	if !ok {
 		return nil, nil
 	}
 
-	r, e := s.results[0], s.errs[0]
-	s.results, s.errs = s.results[1:], s.errs[1:]
-
-	return r, e
+	return results.results, results.err
 }
 
-func (s *spyExecutor) SetResults(results [][]string, errs []error) {
+func (s *spyExecutor) SetResults(command string, results []string, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.results = results
-	s.errs = errs
+	s.m[command] = struct {
+		results []string
+		err     error
+	}{
+		results: results,
+		err:     err,
+	}
 }
 
 func (s *spyExecutor) Paths() []string {
