@@ -65,6 +65,23 @@ func TestScheduler(t *testing.T) {
 		))
 	})
 
+	o.Spec("it does not keep track of DoOnce tasks", func(t TS) {
+		t.s.SetTasks([]scheduler.MetaTask{
+			{
+				Task:   scheduler.Task{RepoPath: "a"},
+				DoOnce: true,
+			},
+		})
+		t.s.SetTasks([]scheduler.MetaTask{
+			{
+				Task:   scheduler.Task{RepoPath: "a"},
+				DoOnce: true,
+			},
+		})
+
+		Expect(t, t.spyTaskManager.adds).To(HaveLen(2))
+	})
+
 	o.Spec("it removes stale tasks", func(t TS) {
 		t.s.SetTasks([]scheduler.MetaTask{
 			{

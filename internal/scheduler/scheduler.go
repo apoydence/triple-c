@@ -34,15 +34,14 @@ func New(m TaskManager) *Scheduler {
 
 func (s *Scheduler) SetTasks(ts []MetaTask) {
 	var newCurrent []MetaTask
-	defer func() {
-		s.currentTasks = newCurrent
-	}()
 
 	for _, t := range ts {
 		if s.findTask(t, s.currentTasks) {
 			continue
 		}
-		newCurrent = append(newCurrent, t)
+		if !t.DoOnce {
+			newCurrent = append(newCurrent, t)
+		}
 		s.m.Add(t)
 	}
 
@@ -52,6 +51,8 @@ func (s *Scheduler) SetTasks(ts []MetaTask) {
 		}
 		s.m.Remove(t)
 	}
+
+	s.currentTasks = newCurrent
 }
 
 func (s *Scheduler) findTask(t MetaTask, ts []MetaTask) bool {
