@@ -41,3 +41,15 @@ func (r *RepoRegistry) FetchRepo(repoPath string) (*Repo, error) {
 
 	return repo, nil
 }
+
+func (r *RepoRegistry) ListRepos() []*Repo {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	var repos []*Repo
+	for _, k := range r.m {
+		repos = append(repos, k)
+	}
+
+	return repos
+}

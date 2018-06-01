@@ -24,15 +24,23 @@ type Metrics interface {
 	NewCounter(name string) func(delta uint64)
 }
 
+type SHATracker interface {
+	Register(ctx context.Context, repoName, branch string) func(SHA string)
+}
+
 func StartWatcher(
 	ctx context.Context,
+	repoName string,
 	branch string,
 	commit func(SHA string),
 	interval time.Duration,
 	shaFetcher SHAFetcher,
+	shaTracker SHATracker,
 	m Metrics,
 	log *log.Logger,
 ) {
+	tracker := shaTracker.Register(ctx, repoName, branch)
+
 	w := &Watcher{
 		commit:     commit,
 		branch:     branch,
@@ -43,16 +51,18 @@ func StartWatcher(
 		gitErrs:  m.NewCounter("GitErrs"),
 	}
 
-	go w.start(ctx, interval)
+	go w.start(ctx, interval, tracker)
 }
 
-func (w *Watcher) start(ctx context.Context, interval time.Duration) {
+func (w *Watcher) start(ctx context.Context, interval time.Duration, tracker func(SHA string)) {
 	var last string
 	for {
 		if ctx.Err() != nil {
 			return
 		}
 		last = w.readSHA(last)
+		tracker(last)
+
 		time.Sleep(interval)
 	}
 }

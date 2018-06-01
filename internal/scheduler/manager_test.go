@@ -57,6 +57,7 @@ func TestManager(t *testing.T) {
 					}
 					return "", false
 				},
+				nil,
 				spyMetrics,
 				log.New(ioutil.Discard, "", 0),
 			),
@@ -73,6 +74,8 @@ func TestManager(t *testing.T) {
 
 		Expect(t, t.spyGitWatcher.commit).To(Not(BeNil()))
 		Expect(t, t.spyGitWatcher.branch).To(Equal("some-branch"))
+		Expect(t, t.spyGitWatcher.repoName).To(Equal("some-path"))
+
 		t.spyGitWatcher.commit("some-sha")
 		Expect(t, t.spyTaskCreator.command).To(ContainSubstring("some-command"))
 		Expect(t, t.spyTaskCreator.appGuid).To(Equal("some-guid"))
@@ -328,10 +331,12 @@ func (s *spyTaskCreator) ListTasks(appGuid string) ([]string, error) {
 
 type spyGitWatcher struct {
 	ctx        context.Context
+	repoName   string
 	branch     string
 	commit     func(SHA string)
 	interval   time.Duration
 	shaFetcher git.SHAFetcher
+	shaTracker git.SHATracker
 	m          git.Metrics
 	log        *log.Logger
 }
@@ -342,18 +347,22 @@ func newSpyGitWatcher() *spyGitWatcher {
 
 func (s *spyGitWatcher) StartWatcher(
 	ctx context.Context,
+	repoName string,
 	branch string,
 	commit func(SHA string),
 	interval time.Duration,
 	shaFetcher git.SHAFetcher,
+	shaTracker git.SHATracker,
 	m git.Metrics,
 	log *log.Logger,
 ) {
 	s.ctx = ctx
+	s.repoName = repoName
 	s.branch = branch
 	s.commit = commit
 	s.interval = interval
 	s.shaFetcher = shaFetcher
+	s.shaTracker = shaTracker
 	s.m = m
 	s.log = log
 }

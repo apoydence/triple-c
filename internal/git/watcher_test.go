@@ -19,6 +19,7 @@ type TW struct {
 	*testing.T
 	spySHAFetcher *spySHAFetcher
 	spyMetrics    *spyMetrics
+	spySHATracker *spySHATracker
 	shas          []string
 	mu            *sync.Mutex
 }
@@ -43,6 +44,7 @@ func TestWatcher(t *testing.T) {
 			T:             t,
 			spySHAFetcher: newSpySHAFetcher(),
 			spyMetrics:    newSpyMetrics(),
+			spySHATracker: newSpySHATracker(),
 			mu:            &sync.Mutex{},
 		}
 	})
@@ -79,11 +81,29 @@ func TestWatcher(t *testing.T) {
 		Expect(t, t.spyMetrics.GetDelta("GitErrs")).To(ViaPolling(Equal(uint64(1))))
 		Expect(t, t.spyMetrics.GetDelta("GitReads")()).To(Not(Equal(uint64(0))))
 	})
+
+	o.Spec("it registers with the SHA Tracker", func(t *TW) {
+		t.spySHAFetcher.errs = []error{nil, nil, nil}
+		t.spySHAFetcher.shas = []string{"sha1", "sha1", "sha2"}
+
+		ctx, _ := context.WithCancel(context.Background())
+		startWatcherWithContext(ctx, t)
+
+		Expect(t, t.spySHATracker.repoName).To(Equal("some-repo"))
+		Expect(t, t.spySHATracker.branch).To(Equal("some-branch"))
+		Expect(t, t.spySHATracker.ctx).To(Equal(ctx))
+
+		Expect(t, t.spySHATracker.SHAs).To(ViaPolling(And(
+			Contain("sha1"),
+			Contain("sha2"),
+		)))
+	})
 }
 
 func startWatcherWithContext(ctx context.Context, t *TW) {
 	git.StartWatcher(
 		ctx,
+		"some-repo",
 		"some-branch",
 		func(sha string) {
 			t.mu.Lock()
@@ -92,6 +112,7 @@ func startWatcherWithContext(ctx context.Context, t *TW) {
 		},
 		time.Millisecond,
 		t.spySHAFetcher,
+		t.spySHATracker,
 		t.spyMetrics,
 		log.New(ioutil.Discard, "", 0),
 	)
@@ -100,6 +121,7 @@ func startWatcherWithContext(ctx context.Context, t *TW) {
 func startWatcher(t *TW) {
 	git.StartWatcher(
 		context.Background(),
+		"some-repo",
 		"some-branch",
 		func(sha string) {
 			t.mu.Lock()
@@ -108,6 +130,7 @@ func startWatcher(t *TW) {
 		},
 		time.Millisecond,
 		t.spySHAFetcher,
+		t.spySHATracker,
 		t.spyMetrics,
 		log.New(ioutil.Discard, "", 0),
 	)
@@ -179,4 +202,41 @@ func (s *spySHAFetcher) Branches() []string {
 	r := make([]string, len(s.branches))
 	copy(r, s.branches)
 	return r
+}
+
+type spySHATracker struct {
+	mu sync.Mutex
+
+	ctx      context.Context
+	repoName string
+	branch   string
+	shas     []string
+}
+
+func newSpySHATracker() *spySHATracker {
+	return &spySHATracker{}
+}
+
+func (s *spySHATracker) Register(ctx context.Context, repoName, branch string) func(SHA string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ctx = ctx
+	s.repoName = repoName
+	s.branch = branch
+
+	return func(SHA string) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
+		s.shas = append(s.shas, SHA)
+	}
+}
+
+func (s *spySHATracker) SHAs() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	results := make([]string, len(s.shas))
+	copy(results, s.shas)
+	return results
 }

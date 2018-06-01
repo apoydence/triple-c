@@ -45,6 +45,12 @@ func TestRepoRegistry(t *testing.T) {
 
 		Expect(t, repo1).To(Not(Equal(repo2)))
 		Expect(t, repo1).To(Equal(repo3))
+
+		Expect(t, t.r.ListRepos()).To(HaveLen(2))
+		Expect(t, t.r.ListRepos()).To(And(
+			Contain(repo1),
+			Contain(repo2),
+		))
 	})
 
 	o.Spec("it returns an error when creating the repo fails", func(t TRR) {
@@ -62,6 +68,12 @@ func TestRepoRegistry(t *testing.T) {
 		go func() {
 			for i := 0; i < 100; i++ {
 				t.r.FetchRepo("some-path-1")
+			}
+		}()
+
+		go func() {
+			for i := 0; i < 100; i++ {
+				t.r.ListRepos()
 			}
 		}()
 

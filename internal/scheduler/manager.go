@@ -27,6 +27,7 @@ type Manager struct {
 	ps              ParameterStore
 
 	taskCreator TaskCreator
+	shaTracker  git.SHATracker
 
 	startWatcher GitWatcher
 	repoRegistry RepoRegistry
@@ -37,10 +38,12 @@ type Manager struct {
 
 type GitWatcher func(
 	ctx context.Context,
+	repoName string,
 	branch string,
 	commit func(SHA string),
 	interval time.Duration,
 	shaFetcher git.SHAFetcher,
+	shaTracker git.SHATracker,
 	m git.Metrics,
 	log *log.Logger,
 )
@@ -73,6 +76,7 @@ func NewManager(
 	w GitWatcher,
 	repoRegistry RepoRegistry,
 	ps ParameterStore,
+	shaTracker git.SHATracker,
 	m Metrics,
 	log *log.Logger,
 ) *Manager {
@@ -91,6 +95,7 @@ func NewManager(
 		m:            m,
 		ps:           ps,
 
+		shaTracker:  shaTracker,
 		taskCreator: tc,
 
 		successfulTasks: successfulTasks,
@@ -119,6 +124,7 @@ func (m *Manager) Add(t MetaTask) {
 
 	m.startWatcher(
 		ctx,
+		t.RepoPath,
 		m.branch,
 		func(SHA string) {
 			if !m.checkAndRemove(t, t.DoOnce) {
@@ -167,6 +173,7 @@ func (m *Manager) Add(t MetaTask) {
 		},
 		time.Minute,
 		repo,
+		m.shaTracker,
 		m.m,
 		m.log,
 	)

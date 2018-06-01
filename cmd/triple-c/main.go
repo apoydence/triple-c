@@ -16,6 +16,7 @@ import (
 	envstruct "code.cloudfoundry.org/go-envstruct"
 	"github.com/apoydence/triple-c/internal/capi"
 	"github.com/apoydence/triple-c/internal/git"
+	"github.com/apoydence/triple-c/internal/handlers"
 	"github.com/apoydence/triple-c/internal/metrics"
 	"github.com/apoydence/triple-c/internal/scheduler"
 	"github.com/cloudfoundry-incubator/uaago"
@@ -87,6 +88,8 @@ func main() {
 		return lines, nil
 	})
 
+	shaTracker := metrics.NewSHATracker()
+
 	repoRegistry := git.NewRepoRegistry(tmpDir, execer, m)
 	configRepo, err := repoRegistry.FetchRepo(cfg.RepoPath)
 	if err != nil {
@@ -95,7 +98,7 @@ func main() {
 
 	startBranch := func(ctx context.Context, branch string) {
 		go func() {
-			log.Printf("Watch branch %s", branch)
+			log.Printf("Watching branch %s", branch)
 			manager := scheduler.NewManager(
 				ctx,
 				cfg.VcapApplication.ApplicationID,
@@ -104,6 +107,7 @@ func main() {
 				git.StartWatcher,
 				repoRegistry,
 				os.LookupEnv,
+				shaTracker,
 				m,
 				log,
 			)
@@ -113,6 +117,7 @@ func main() {
 			failConfig := m.NewCounter("FailedConifig")
 			git.StartWatcher(
 				ctx,
+				cfg.RepoPath,
 				branch,
 				func(sha string) {
 					var ts []scheduler.MetaTask
@@ -130,6 +135,7 @@ func main() {
 				},
 				time.Minute,
 				configRepo,
+				shaTracker,
 				m,
 				log,
 			)
@@ -149,6 +155,9 @@ func main() {
 		m,
 		log,
 	)
+
+	repoHandler := handlers.NewRepos(shaTracker, log)
+	http.Handle("/v1/repos", repoHandler)
 
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), nil))
 }
