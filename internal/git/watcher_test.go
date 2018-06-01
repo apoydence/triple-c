@@ -56,7 +56,6 @@ func TestWatcher(t *testing.T) {
 
 		Expect(t, t.Shas).To(ViaPolling(Equal([]string{"sha1", "sha2"})))
 
-		Expect(t, t.spySHAFetcher.Branches).To(ViaPolling(Contain("some-branch")))
 		Expect(t, t.spyMetrics.GetDelta("GitErrs")).To(ViaPolling(Equal(uint64(0))))
 		Expect(t, t.spyMetrics.GetDelta("GitReads")()).To(Not(Equal(uint64(0))))
 	})
@@ -83,6 +82,8 @@ func TestWatcher(t *testing.T) {
 	})
 
 	o.Spec("it registers with the SHA Tracker", func(t *TW) {
+		t.spySHAFetcher.name = "some-repo"
+		t.spySHAFetcher.currentBranch = "some-branch"
 		t.spySHAFetcher.errs = []error{nil, nil, nil}
 		t.spySHAFetcher.shas = []string{"sha1", "sha1", "sha2"}
 
@@ -103,8 +104,6 @@ func TestWatcher(t *testing.T) {
 func startWatcherWithContext(ctx context.Context, t *TW) {
 	git.StartWatcher(
 		ctx,
-		"some-repo",
-		"some-branch",
 		func(sha string) {
 			t.mu.Lock()
 			defer t.mu.Unlock()
@@ -121,8 +120,6 @@ func startWatcherWithContext(ctx context.Context, t *TW) {
 func startWatcher(t *TW) {
 	git.StartWatcher(
 		context.Background(),
-		"some-repo",
-		"some-branch",
 		func(sha string) {
 			t.mu.Lock()
 			defer t.mu.Unlock()
@@ -164,8 +161,9 @@ func (s *spyMetrics) GetDelta(name string) func() uint64 {
 }
 
 type spySHAFetcher struct {
-	mu       sync.Mutex
-	branches []string
+	mu            sync.Mutex
+	name          string
+	currentBranch string
 
 	shas []string
 	errs []error
@@ -175,11 +173,9 @@ func newSpySHAFetcher() *spySHAFetcher {
 	return &spySHAFetcher{}
 }
 
-func (s *spySHAFetcher) SHA(branch string) (string, error) {
+func (s *spySHAFetcher) SHA() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	s.branches = append(s.branches, branch)
 
 	if len(s.shas) != len(s.errs) {
 		panic("out of sync")
@@ -195,13 +191,12 @@ func (s *spySHAFetcher) SHA(branch string) (string, error) {
 	return sha, e
 }
 
-func (s *spySHAFetcher) Branches() []string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *spySHAFetcher) Name() string {
+	return s.name
+}
 
-	r := make([]string, len(s.branches))
-	copy(r, s.branches)
-	return r
+func (s *spySHAFetcher) CurrentBranch() string {
+	return s.currentBranch
 }
 
 type spySHATracker struct {
