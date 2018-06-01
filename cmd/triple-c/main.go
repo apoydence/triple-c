@@ -131,6 +131,7 @@ func main() {
 							DoOnce: t.RepoPath == cfg.RepoPath,
 						})
 					}
+					fmt.Println("!!!!!!!!!!", branch, sha, ts)
 					sched.SetTasks(ts)
 				},
 				time.Minute,
