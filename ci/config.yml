@@ -36,6 +36,7 @@ plans:
       popd
 
   - name: CD
+    branch_guard: remotes/origin/master
     parameters:
       CF_SYSTEM_DOMAIN: ((CF_SYSTEM_DOMAIN))
       CF_USERNAME: ((CF_USERNAME))
@@ -55,8 +56,6 @@ plans:
       mv triple-c $GOPATH/src/github.com/apoydence/
 
       pushd $GOPATH/src/github.com/apoydence/triple-c/cmd/triple-c
-      if [[ $(git branch | egrep "^\*" | grep "origin/master") ]]; then
-
           export DESTINATION=/dev/shm
 
           # Install go build tool
@@ -94,5 +93,4 @@ plans:
               go build
               cf push $CF_APP_NAME &> /dev/null
           fi
-      fi
       popd

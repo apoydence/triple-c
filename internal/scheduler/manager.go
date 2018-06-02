@@ -162,6 +162,11 @@ func (m *Manager) startPlanForSHA(SHA string, t MetaPlan, taskLock *sync.Mutex) 
 	defer taskLock.Unlock()
 
 	for taskIndex, task := range t.Tasks {
+		if task.BranchGuard != "" && task.BranchGuard != m.branch {
+			m.log.Printf("skipping task for %s on branch %s (BranchGuard %s)", SHA, m.branch, task.BranchGuard)
+			continue
+		}
+
 		if !m.startTaskForSHA(SHA, task, t, taskIndex) {
 			return
 		}
