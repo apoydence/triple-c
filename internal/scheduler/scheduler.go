@@ -22,9 +22,10 @@ type Plan struct {
 }
 
 type Task struct {
-	Name       string            `yaml:"name"`
-	Command    string            `yaml:"command"`
-	Parameters map[string]string `yaml:"parameters"`
+	Name        string            `yaml:"name"`
+	Command     string            `yaml:"command"`
+	Parameters  map[string]string `yaml:"parameters"`
+	BranchGuard string            `yaml:"branch_guard"`
 }
 
 type TaskManager interface {

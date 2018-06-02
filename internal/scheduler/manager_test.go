@@ -97,6 +97,33 @@ func TestManager(t *testing.T) {
 		Expect(t, t.spyMetrics.GetDelta("FailedTasks")()).To(Equal(uint64(0)))
 	})
 
+	o.Spec("it guards for certain branches", func(t TM) {
+		t.m.Add(scheduler.MetaPlan{
+			Plan: scheduler.Plan{
+				RepoPaths: map[string]string{"some-repo": "some-path"},
+				Tasks: []scheduler.Task{
+					{
+						Command:     "some-other-command",
+						BranchGuard: "some-other-branch",
+					},
+					{
+						Command:     "some-command",
+						BranchGuard: "some-branch",
+					},
+				},
+			},
+		})
+
+		Expect(t, t.spyGitWatcher.commit).To(Not(BeNil()))
+		Expect(t, t.spyGitWatcher.branch).To(Equal("some-branch"))
+		Expect(t, t.spyGitWatcher.repoName).To(Equal("some-path"))
+
+		t.spyGitWatcher.commit("some-sha")
+		Expect(t, t.spyTaskCreator.command).To(ContainSubstring("some-command"))
+		Expect(t, t.spyTaskCreator.appGuid).To(Equal("some-guid"))
+		Expect(t, t.spyMetrics.GetDelta("SuccessfulTasks")()).To(Equal(uint64(1)))
+	})
+
 	o.Spec("it handles multiple RepoPaths", func(t TM) {
 		t.m.Add(scheduler.MetaPlan{
 			Plan: scheduler.Plan{

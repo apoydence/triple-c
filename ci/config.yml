@@ -36,6 +36,7 @@ plans:
       popd
 
   - name: CD
+    branch_guard: origin/master
     parameters:
       CF_SYSTEM_DOMAIN: ((CF_SYSTEM_DOMAIN))
       CF_USERNAME: ((CF_USERNAME))
