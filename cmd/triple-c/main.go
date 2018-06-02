@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"expvar"
 	"fmt"
 	"io/ioutil"
@@ -42,9 +43,17 @@ func main() {
 
 	capi := capi.NewClient(
 		cfg.VcapApplication.CAPIAddr,
+		time.Second,
 		capi.NewHTTPClient(
 			&http.Client{
 				Timeout: 5 * time.Second,
+				Transport: &http.Transport{
+					TLSHandshakeTimeout: 10 * time.Second,
+					TLSClientConfig: &tls.Config{
+						InsecureSkipVerify: cfg.SkipSSLValidation,
+						MinVersion:         tls.VersionTLS12,
+					},
+				},
 			},
 			capi.TokenFetcherFunc(func() (string, error) {
 				rt, at, err := uaaClient.GetRefreshToken(cfg.ClientID, cfg.RefreshToken, cfg.SkipSSLValidation)
@@ -120,18 +129,32 @@ func main() {
 				cfg.RepoPath,
 				branch,
 				func(sha string) {
-					var ts []scheduler.MetaTask
-					for _, t := range fetchConfigFile(sha, cfg.ConfigPath, configRepo, failConfig, successfulConfig, log).Tasks {
-						if t.Command == "" || t.RepoPath == "" {
-							log.Printf("invalid task: %+v", t)
+					var ts []scheduler.MetaPlan
+					for _, plan := range fetchConfigFile(sha, cfg.ConfigPath, configRepo, failConfig, successfulConfig, log).Plans {
+						if len(plan.RepoPaths) == 0 {
 							continue
 						}
-						ts = append(ts, scheduler.MetaTask{
-							Task:   t,
-							DoOnce: t.RepoPath == cfg.RepoPath,
+
+						for _, t := range plan.Tasks {
+							if t.Command == "" {
+								log.Fatalf("invalid task: %+v", t)
+							}
+						}
+
+						var doOnce bool
+						for _, repoPath := range plan.RepoPaths {
+							if repoPath == cfg.RepoPath {
+								doOnce = true
+								break
+							}
+						}
+
+						ts = append(ts, scheduler.MetaPlan{
+							Plan:   plan,
+							DoOnce: doOnce,
 						})
 					}
-					sched.SetTasks(ts)
+					sched.SetPlans(ts)
 				},
 				time.Minute,
 				configRepo,
@@ -162,19 +185,19 @@ func main() {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), nil))
 }
 
-func fetchConfigFile(SHA, filePath string, repo *git.Repo, fail, succ func(uint64), log *log.Logger) scheduler.Tasks {
+func fetchConfigFile(SHA, filePath string, repo *git.Repo, fail, succ func(uint64), log *log.Logger) scheduler.Plans {
 	data, err := repo.File(SHA, filePath)
 	if err != nil {
 		log.Printf("failed to find config file: %s", err)
 		fail(1)
-		return scheduler.Tasks{}
+		return scheduler.Plans{}
 	}
 
-	var t scheduler.Tasks
+	var t scheduler.Plans
 	if err := yaml.Unmarshal([]byte(data), &t); err != nil {
 		log.Printf("failed to find config file: %s", err)
 		fail(1)
-		return scheduler.Tasks{}
+		return scheduler.Plans{}
 	}
 
 	succ(1)

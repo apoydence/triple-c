@@ -65,10 +65,14 @@ func TestManager(t *testing.T) {
 	})
 
 	o.Spec("it starts a task when a commit comes through", func(t TM) {
-		t.m.Add(scheduler.MetaTask{
-			Task: scheduler.Task{
-				RepoPath: "some-path",
-				Command:  "some-command",
+		t.m.Add(scheduler.MetaPlan{
+			Plan: scheduler.Plan{
+				RepoPaths: map[string]string{"some-repo": "some-path"},
+				Tasks: []scheduler.Task{
+					{
+						Command: "some-command",
+					},
+				},
 			},
 		})
 
@@ -87,16 +91,83 @@ func TestManager(t *testing.T) {
 		Expect(t, json.Unmarshal(dataName, &m)).To(BeNil())
 		Expect(t, m["sha"]).To(Equal("some-sha"))
 		Expect(t, m["branch"]).To(Equal("some-branch"))
+		Expect(t, m["task_index"]).To(Equal(0.0))
 
 		Expect(t, t.spyMetrics.GetDelta("SuccessfulTasks")()).To(Equal(uint64(1)))
 		Expect(t, t.spyMetrics.GetDelta("FailedTasks")()).To(Equal(uint64(0)))
 	})
 
+	o.Spec("it handles multiple RepoPaths", func(t TM) {
+		t.m.Add(scheduler.MetaPlan{
+			Plan: scheduler.Plan{
+				RepoPaths: map[string]string{"some-repo-path": "some-path", "some-other-repo": "some-other-path"},
+				Tasks: []scheduler.Task{
+					{
+						Command: "some-command",
+					},
+				},
+			},
+		})
+
+		Expect(t, t.spyGitWatcher.called).To(Equal(2))
+	})
+
+	o.Spec("it starts the next task", func(t TM) {
+		t.m.Add(scheduler.MetaPlan{
+			Plan: scheduler.Plan{
+				RepoPaths: map[string]string{"some-repo": "some-path"},
+				Tasks: []scheduler.Task{
+					{
+						Command: "some-command",
+					},
+					{
+						Command: "some-other-command",
+					},
+				},
+			},
+		})
+
+		Expect(t, t.spyGitWatcher.commit).To(Not(BeNil()))
+		Expect(t, t.spyGitWatcher.branch).To(Equal("some-branch"))
+		Expect(t, t.spyGitWatcher.repoName).To(Equal("some-path"))
+
+		t.spyGitWatcher.commit("some-sha")
+		Expect(t, t.spyTaskCreator.command).To(ContainSubstring("some-other-command"))
+	})
+
+	o.Spec("it does not start the next task if the first fails", func(t TM) {
+		t.spyTaskCreator.err = errors.New("some-error")
+		t.m.Add(scheduler.MetaPlan{
+			Plan: scheduler.Plan{
+				RepoPaths: map[string]string{"some-repo": "some-path"},
+				Tasks: []scheduler.Task{
+					{
+						Command: "some-command",
+					},
+					{
+						Command: "some-other-command",
+					},
+				},
+			},
+		})
+
+		Expect(t, t.spyGitWatcher.commit).To(Not(BeNil()))
+		Expect(t, t.spyGitWatcher.branch).To(Equal("some-branch"))
+		Expect(t, t.spyGitWatcher.repoName).To(Equal("some-path"))
+
+		t.spyGitWatcher.commit("some-sha")
+		Expect(t, t.spyTaskCreator.command).To(Not(ContainSubstring("some-other-command")))
+	})
+
 	o.Spec("it starts a task once if the DoOnce is set", func(t TM) {
-		t.m.Add(scheduler.MetaTask{
-			Task: scheduler.Task{
-				RepoPath: "some-path",
-				Command:  "some-command",
+		t.m.Add(scheduler.MetaPlan{
+			Plan: scheduler.Plan{
+				RepoPaths: map[string]string{"some-repo": "some-path"},
+				Tasks: []scheduler.Task{
+					{
+						Command: "some-command",
+					},
+				},
 			},
 			DoOnce: true,
 		})
@@ -110,10 +181,14 @@ func TestManager(t *testing.T) {
 	})
 
 	o.Spec("it starts a task multiple times if the DoOnce is not set", func(t TM) {
-		t.m.Add(scheduler.MetaTask{
-			Task: scheduler.Task{
-				RepoPath: "some-path",
-				Command:  "some-command",
+		t.m.Add(scheduler.MetaPlan{
+			Plan: scheduler.Plan{
+				RepoPaths: map[string]string{"some-repo": "some-path"},
+				Tasks: []scheduler.Task{
+					{
+						Command: "some-command",
+					},
+				},
 			},
 			DoOnce: false,
 		})
@@ -127,15 +202,19 @@ func TestManager(t *testing.T) {
 	})
 
 	o.Spec("it sets the given environment variables", func(t TM) {
-		t.m.Add(scheduler.MetaTask{
-			Task: scheduler.Task{
-				RepoPath: "some-path",
-				Command:  "some-command",
-				Parameters: map[string]string{
-					"SOME_VAR":       "some-value",
-					"SOME_OTHER_VAR": "some-other-value",
-					"LOOKUP":         "((KNOWN_KEY))",
-					"DONT_LOOKUP":    "((UNKNOWN_KEY))",
+		t.m.Add(scheduler.MetaPlan{
+			Plan: scheduler.Plan{
+				RepoPaths: map[string]string{"some-repo": "some-path"},
+				Tasks: []scheduler.Task{
+					{
+						Command: "some-command",
+						Parameters: map[string]string{
+							"SOME_VAR":       "some-value",
+							"SOME_OTHER_VAR": "some-other-value",
+							"LOOKUP":         "((KNOWN_KEY))",
+							"DONT_LOOKUP":    "((UNKNOWN_KEY))",
+						},
+					},
 				},
 			},
 		})
@@ -154,10 +233,14 @@ func TestManager(t *testing.T) {
 	})
 
 	o.Spec("it does not start a task when a commit comes through but there is a task for it already", func(t TM) {
-		t.m.Add(scheduler.MetaTask{
-			Task: scheduler.Task{
-				RepoPath: "some-path",
-				Command:  "some-command",
+		t.m.Add(scheduler.MetaPlan{
+			Plan: scheduler.Plan{
+				RepoPaths: map[string]string{"some-repo": "some-path"},
+				Tasks: []scheduler.Task{
+					{
+						Command: "some-command",
+					},
+				},
 			},
 		})
 
@@ -175,10 +258,14 @@ func TestManager(t *testing.T) {
 	})
 
 	o.Spec("it does not dedupe commits on different branches", func(t TM) {
-		t.m.Add(scheduler.MetaTask{
-			Task: scheduler.Task{
-				RepoPath: "some-path",
-				Command:  "some-command",
+		t.m.Add(scheduler.MetaPlan{
+			Plan: scheduler.Plan{
+				RepoPaths: map[string]string{"some-repo": "some-path"},
+				Tasks: []scheduler.Task{
+					{
+						Command: "some-command",
+					},
+				},
 			},
 		})
 
@@ -196,10 +283,14 @@ func TestManager(t *testing.T) {
 
 	o.Spec("it increments FailedTasks when a task fails", func(t TM) {
 		t.spyTaskCreator.err = errors.New("some-error")
-		t.m.Add(scheduler.MetaTask{
-			Task: scheduler.Task{
-				RepoPath: "some-path",
-				Command:  "some-command",
+		t.m.Add(scheduler.MetaPlan{
+			Plan: scheduler.Plan{
+				RepoPaths: map[string]string{"some-repo": "some-path"},
+				Tasks: []scheduler.Task{
+					{
+						Command: "some-command",
+					},
+				},
 			},
 		})
 		Expect(t, t.spyGitWatcher.commit).To(Not(BeNil()))
@@ -211,10 +302,14 @@ func TestManager(t *testing.T) {
 
 	o.Spec("it increments FailedRepos when a repo fails to be fetched", func(t TM) {
 		t.spyRepoRegistry.err = errors.New("some-err")
-		t.m.Add(scheduler.MetaTask{
-			Task: scheduler.Task{
-				RepoPath: "some-path",
-				Command:  "some-command",
+		t.m.Add(scheduler.MetaPlan{
+			Plan: scheduler.Plan{
+				RepoPaths: map[string]string{"some-repo": "some-path"},
+				Tasks: []scheduler.Task{
+					{
+						Command: "some-command",
+					},
+				},
 			},
 		})
 
@@ -223,17 +318,25 @@ func TestManager(t *testing.T) {
 	})
 
 	o.Spec("it cancels the context when a task is removed", func(t TM) {
-		t.m.Add(scheduler.MetaTask{
-			Task: scheduler.Task{
-				RepoPath: "some-path",
-				Command:  "some-command",
+		t.m.Add(scheduler.MetaPlan{
+			Plan: scheduler.Plan{
+				RepoPaths: map[string]string{"some-repo": "some-path"},
+				Tasks: []scheduler.Task{
+					{
+						Command: "some-command",
+					},
+				},
 			},
 		})
 
-		t.m.Remove(scheduler.MetaTask{
-			Task: scheduler.Task{
-				RepoPath: "some-path",
-				Command:  "some-command",
+		t.m.Remove(scheduler.MetaPlan{
+			Plan: scheduler.Plan{
+				RepoPaths: map[string]string{"some-repo": "some-path"},
+				Tasks: []scheduler.Task{
+					{
+						Command: "some-command",
+					},
+				},
 			},
 		})
 
@@ -245,10 +348,14 @@ func TestManager(t *testing.T) {
 
 	o.Spec("it handles removing a task that never was added", func(t TM) {
 		Expect(t, func() {
-			t.m.Remove(scheduler.MetaTask{
-				Task: scheduler.Task{
-					RepoPath: "some-path",
-					Command:  "some-command",
+			t.m.Remove(scheduler.MetaPlan{
+				Plan: scheduler.Plan{
+					RepoPaths: map[string]string{"some-repo": "some-path"},
+					Tasks: []scheduler.Task{
+						{
+							Command: "some-command",
+						},
+					},
 				},
 			})
 		}).To(Not(Panic()))
@@ -257,38 +364,44 @@ func TestManager(t *testing.T) {
 	o.Spec("it survives the race detector", func(t TM) {
 		go func() {
 			for i := 0; i < 100; i++ {
-				t.m.Add(scheduler.MetaTask{
-					Task: scheduler.Task{
-						RepoPath: "some-path",
+				t.m.Add(scheduler.MetaPlan{
+					Plan: scheduler.Plan{
+						RepoPaths: map[string]string{"some-repo": "some-path"},
+						Tasks: []scheduler.Task{
+							{
+								Command: "some-command",
+							},
+						},
 					},
 				})
 			}
 		}()
 
-		go func() {
-			for i := 0; i < 100; i++ {
-				t.m.Remove(scheduler.MetaTask{
-					Task: scheduler.Task{
-						RepoPath: "some-path",
-					},
-				})
-			}
-		}()
+		for i := 0; i < 2; i++ {
+			go func() {
+				for i := 0; i < 100; i++ {
+					t.m.Remove(scheduler.MetaPlan{
+						Plan: scheduler.Plan{
+							RepoPaths: map[string]string{"some-repo": "some-path"},
+							Tasks: []scheduler.Task{
+								{
+									Command: "some-command",
+								},
+							},
+						},
+					})
+				}
+			}()
+		}
 
-		// We want remove happening on two go routines
-		go func() {
-			for i := 0; i < 100; i++ {
-				t.m.Remove(scheduler.MetaTask{
-					Task: scheduler.Task{
-						RepoPath: "some-path",
+		t.m.Add(scheduler.MetaPlan{
+			Plan: scheduler.Plan{
+				RepoPaths: map[string]string{"some-repo": "some-path"},
+				Tasks: []scheduler.Task{
+					{
+						Command: "some-command",
 					},
-				})
-			}
-		}()
-
-		t.m.Add(scheduler.MetaTask{
-			Task: scheduler.Task{
-				RepoPath: "some-path",
+				},
 			},
 		})
 	})
@@ -330,6 +443,7 @@ func (s *spyTaskCreator) ListTasks(appGuid string) ([]string, error) {
 }
 
 type spyGitWatcher struct {
+	called     int
 	ctx        context.Context
 	repoName   string
 	branch     string
@@ -356,6 +470,7 @@ func (s *spyGitWatcher) StartWatcher(
 	m git.Metrics,
 	log *log.Logger,
 ) {
+	s.called++
 	s.ctx = ctx
 	s.repoName = repoName
 	s.branch = branch
