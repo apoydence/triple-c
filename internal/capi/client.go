@@ -3,26 +3,30 @@ package capi
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 type Client struct {
-	addr string
-	doer Doer
+	addr     string
+	doer     Doer
+	interval time.Duration
 }
 
 type Doer interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-func NewClient(addr string, d Doer) *Client {
+func NewClient(addr string, interval time.Duration, d Doer) *Client {
 	return &Client{
-		doer: d,
-		addr: addr,
+		doer:     d,
+		addr:     addr,
+		interval: interval,
 	}
 }
 
@@ -62,14 +66,65 @@ func (c *Client) CreateTask(
 		return err
 	}
 
-	defer func() {
+	defer func(resp *http.Response) {
+		// Fail safe to ensure the clients are being cleaned up
 		io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
-	}()
+	}(resp)
 
 	if resp.StatusCode != 202 {
 		data, _ := ioutil.ReadAll(resp.Body)
 		return fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, data)
+	}
+
+	for {
+		var results struct {
+			State string `json:"state"`
+			Links struct {
+				Self struct {
+					Href string `json:"href"`
+				} `json:"self"`
+			} `json:"links"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&results); err != nil {
+			return err
+		}
+		resp.Body.Close()
+
+		fmt.Println(results)
+
+		switch results.State {
+		case "RUNNING":
+			time.Sleep(c.interval)
+
+			u, err := url.Parse(results.Links.Self.Href)
+			if err != nil {
+				return err
+			}
+
+			req := &http.Request{
+				URL:    u,
+				Method: "GET",
+				Header: http.Header{},
+			}
+
+			resp, err = c.doer.Do(req)
+			if err != nil {
+				return err
+			}
+
+			defer func(resp *http.Response) {
+				// Fail safe to ensure the clients are being cleaned up
+				io.Copy(ioutil.Discard, resp.Body)
+				resp.Body.Close()
+			}(resp)
+
+			continue
+		case "FAILED":
+			return errors.New("task failed")
+		default:
+			return nil
+		}
 	}
 
 	return nil

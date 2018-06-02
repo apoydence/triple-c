@@ -3,27 +3,33 @@ package scheduler
 type Scheduler struct {
 	m TaskManager
 
-	currentTasks []MetaTask
+	currentPlans []MetaPlan
 }
 
-type Tasks struct {
-	Tasks []Task `yaml:"tasks"`
-}
-
-type MetaTask struct {
-	Task
+type MetaPlan struct {
+	Plan
 	DoOnce bool
 }
 
+type Plans struct {
+	Plans []Plan `yaml:"plans"`
+}
+
+type Plan struct {
+	Name      string            `yaml:"name"`
+	RepoPaths map[string]string `yaml:"repo_paths"`
+	Tasks     []Task            `yaml:"tasks"`
+}
+
 type Task struct {
-	RepoPath   string            `yaml:"repo_path"`
+	Name       string            `yaml:"name"`
 	Command    string            `yaml:"command"`
 	Parameters map[string]string `yaml:"parameters"`
 }
 
 type TaskManager interface {
-	Add(t MetaTask)
-	Remove(t MetaTask)
+	Add(t MetaPlan)
+	Remove(t MetaPlan)
 }
 
 func New(m TaskManager) *Scheduler {
@@ -32,11 +38,11 @@ func New(m TaskManager) *Scheduler {
 	}
 }
 
-func (s *Scheduler) SetTasks(ts []MetaTask) {
-	var newCurrent []MetaTask
+func (s *Scheduler) SetPlans(plans []MetaPlan) {
+	var newCurrent []MetaPlan
 
-	for _, t := range ts {
-		if s.findTask(t, s.currentTasks) {
+	for _, t := range plans {
+		if s.findPlan(t, s.currentPlans) {
 			continue
 		}
 		if !t.DoOnce {
@@ -45,20 +51,20 @@ func (s *Scheduler) SetTasks(ts []MetaTask) {
 		s.m.Add(t)
 	}
 
-	for _, t := range s.currentTasks {
-		if s.findTask(t, ts) {
+	for _, t := range s.currentPlans {
+		if s.findPlan(t, plans) {
 			continue
 		}
 		s.m.Remove(t)
 	}
 
-	s.currentTasks = newCurrent
+	s.currentPlans = newCurrent
 }
 
-func (s *Scheduler) findTask(t MetaTask, ts []MetaTask) bool {
-	et := encodeTask(t)
-	for _, tt := range ts {
-		if encodeTask(tt) == et {
+func (s *Scheduler) findPlan(plan MetaPlan, plans []MetaPlan) bool {
+	ep := encodePlan(plan)
+	for _, p := range plans {
+		if encodePlan(p) == ep {
 			return true
 		}
 	}

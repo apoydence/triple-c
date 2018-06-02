@@ -107,76 +107,99 @@ func NewManager(
 	}
 }
 
-func (m *Manager) Add(t MetaTask) {
+func (m *Manager) Add(t MetaPlan) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	m.log.Printf("Adding task: %+v", t)
 	ctx, cancel := context.WithCancel(context.Background())
-	m.ctxs[encodeTask(t)] = cancel
+	m.ctxs[encodePlan(t)] = cancel
 
-	repo, err := m.repoRegistry.FetchRepo(t.RepoPath)
-	if err != nil {
-		m.log.Printf("failed to fetch repo %s: %s", t.RepoPath, err)
-		m.failedRepos(1)
+	var taskLock sync.Mutex
+
+	for _, repoPath := range t.RepoPaths {
+		repo, err := m.repoRegistry.FetchRepo(repoPath)
+		if err != nil {
+			m.log.Printf("failed to fetch repo %s: %s", repoPath, err)
+			m.failedRepos(1)
+			return
+		}
+
+		m.startWatcher(
+			ctx,
+			repoPath,
+			m.branch,
+			func(SHA string) {
+				m.startPlanForSHA(SHA, t, &taskLock)
+			},
+			time.Minute,
+			repo,
+			m.shaTracker,
+			m.m,
+			m.log,
+		)
+	}
+}
+
+func (m *Manager) startPlanForSHA(SHA string, t MetaPlan, taskLock *sync.Mutex) {
+	if !m.checkAndRemove(t, t.DoOnce) {
 		return
 	}
 
-	m.startWatcher(
-		ctx,
-		t.RepoPath,
-		m.branch,
-		func(SHA string) {
-			if !m.checkAndRemove(t, t.DoOnce) {
-				return
-			}
+	dupe, err := m.duplicate(m.branch, SHA)
+	if err != nil {
+		m.log.Printf("failed deduping tasks: %s", err)
+		return
+	}
 
-			dupe, err := m.duplicate(m.branch, SHA)
-			if err != nil {
-				m.log.Printf("failed deduping tasks: %s", err)
-				return
-			}
+	if dupe {
+		m.log.Printf("skipping task for %s on branch %s", SHA, m.branch)
+		m.dedupedTasks(1)
+		return
+	}
 
-			if dupe {
-				m.log.Printf("skipping task for %s on branch %s", SHA, m.branch)
-				m.dedupedTasks(1)
-				return
-			}
+	taskLock.Lock()
+	defer taskLock.Unlock()
 
-			m.log.Printf("starting task for %s", SHA)
-			defer m.log.Printf("done with task for %s", SHA)
+	for taskIndex, task := range t.Tasks {
+		if !m.startTaskForSHA(SHA, task, t, taskIndex) {
+			return
+		}
+	}
+}
 
-			name, err := json.Marshal(struct {
-				SHA    string `json:"sha"`
-				Branch string `json:"branch"`
-			}{
-				SHA:    SHA,
-				Branch: m.branch,
-			})
-			if err != nil {
-				m.log.Printf("failed to marshal task name: %s", err)
-				return
-			}
+func (m *Manager) startTaskForSHA(SHA string, task Task, t MetaPlan, taskIndex int) bool {
+	m.log.Printf("starting task for %s on branch %s", SHA, m.branch)
+	defer m.log.Printf("done with task for %s on branch %s", SHA, m.branch)
 
-			err = m.taskCreator.CreateTask(
-				m.fetchRepo(t.Task, m.branch, m.ps),
-				base64.StdEncoding.EncodeToString(name),
-				m.appGuid,
-			)
-			if err != nil {
-				m.log.Printf("task for %s failed: %s", SHA, err)
-				m.failedTasks(1)
-				return
-			}
+	name, err := json.Marshal(struct {
+		SHA       string `json:"sha"`
+		Branch    string `json:"branch"`
+		TaskIndex int    `json:"task_index"`
+	}{
+		SHA:       SHA,
+		Branch:    m.branch,
+		TaskIndex: taskIndex,
+	})
+	if err != nil {
+		m.log.Printf("failed to marshal task name: %s", err)
+		return false
+	}
 
-			m.successfulTasks(1)
-		},
-		time.Minute,
-		repo,
-		m.shaTracker,
-		m.m,
-		m.log,
+	err = m.taskCreator.CreateTask(
+		m.fetchRepo(t, task, m.branch, m.ps),
+		base64.StdEncoding.EncodeToString(name),
+		m.appGuid,
 	)
+	if err != nil {
+		m.log.Printf("task for %s failed: %s", SHA, err)
+		m.failedTasks(1)
+		return false
+	}
+
+	m.log.Printf("task for %s on branch %s succeeded", SHA, m.branch)
+	m.successfulTasks(1)
+	return true
 }
 
 func (m *Manager) duplicate(branch, SHA string) (bool, error) {
@@ -207,14 +230,14 @@ func (m *Manager) duplicate(branch, SHA string) (bool, error) {
 	return false, nil
 }
 
-func (m *Manager) Remove(t MetaTask) {
+func (m *Manager) Remove(t MetaPlan) {
 	m.checkAndRemove(t, true)
 }
 
-func (m *Manager) checkAndRemove(t MetaTask, remove bool) bool {
+func (m *Manager) checkAndRemove(t MetaPlan, remove bool) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	cancel, ok := m.ctxs[encodeTask(t)]
+	cancel, ok := m.ctxs[encodePlan(t)]
 	if !ok {
 		return false
 	}
@@ -223,7 +246,7 @@ func (m *Manager) checkAndRemove(t MetaTask, remove bool) bool {
 		return true
 	}
 
-	delete(m.ctxs, encodeTask(t))
+	delete(m.ctxs, encodePlan(t))
 	cancel()
 
 	return true
@@ -231,13 +254,20 @@ func (m *Manager) checkAndRemove(t MetaTask, remove bool) bool {
 
 type encodedTask string
 
-func encodeTask(t MetaTask) encodedTask {
+func encodePlan(p MetaPlan) encodedTask {
 	parameters := []string{
-		t.RepoPath,
-		t.Command,
+		p.Name,
 	}
-	for k, v := range t.Parameters {
-		parameters = append(parameters, fmt.Sprintf("%s=%s", k, v))
+
+	for k, v := range p.RepoPaths {
+		parameters = append(parameters, k, v)
+	}
+
+	for _, t := range p.Tasks {
+		parameters = append(parameters, t.Command, t.Name)
+		for k, v := range t.Parameters {
+			parameters = append(parameters, fmt.Sprintf("%s=%s", k, v))
+		}
 	}
 	sort.Strings(parameters)
 
@@ -245,7 +275,7 @@ func encodeTask(t MetaTask) encodedTask {
 }
 
 // fetchRepo adds the cloning of a repo to the given command
-func (m *Manager) fetchRepo(t Task, branch string, ps ParameterStore) string {
+func (m *Manager) fetchRepo(p MetaPlan, t Task, branch string, ps ParameterStore) string {
 	var parameters string
 	for k, v := range t.Parameters {
 		if !strings.HasPrefix(v, "((") || !strings.HasSuffix(v, "))") {
@@ -259,33 +289,44 @@ func (m *Manager) fetchRepo(t Task, branch string, ps ParameterStore) string {
 		}
 	}
 
-	return fmt.Sprintf(`#!/bin/bash
-set -ex
-
+	var clones string
+	for _, repoPath := range p.RepoPaths {
+		clones = fmt.Sprintf(`
+%s
 rm -rf %s
 git clone %s
 
-
-# If checking out fails, its fine. Move forward with the default branch.
-set +e
-
-# Parameters
-%s
-
 pushd %s
+  # If checking out fails, its fine. Move forward with the default branch.
+  set +e
   git checkout %s
+  set -e
+
   git submodule update --init --recursive
 popd
 
 set +x
+`,
+			clones,
+			path.Base(repoPath),
+			repoPath,
+			path.Base(repoPath),
+			branch,
+		)
+	}
+
+	return fmt.Sprintf(`#!/bin/bash
+set -ex
+
+%s
+
+# Parameters
+%s
 
 %s
 	`,
-		path.Base(t.RepoPath),
-		t.RepoPath,
+		clones,
 		parameters,
-		path.Base(t.RepoPath),
-		branch,
 		t.Command,
 	)
 }

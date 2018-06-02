@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/apoydence/onpar"
 	. "github.com/apoydence/onpar/expect"
@@ -31,7 +32,7 @@ func TestClientCreateTask(t *testing.T) {
 		return TC{
 			T:       t,
 			spyDoer: spyDoer,
-			c:       capi.NewClient("http://some-addr.com", spyDoer),
+			c:       capi.NewClient("http://some-addr.com", time.Millisecond, spyDoer),
 		}
 	})
 
@@ -45,6 +46,32 @@ func TestClientCreateTask(t *testing.T) {
 		Expect(t, t.spyDoer.body).To(MatchJSON(`{"command":"some-command","name":"some-name"}`))
 	})
 
+	o.Spec("it requests the status of the task", func(t TC) {
+		t.spyDoer.m["POST:http://some-addr.com/v3/apps/some-guid/tasks"] = &http.Response{
+			StatusCode: 202,
+			Body:       ioutil.NopCloser(strings.NewReader(`{"lines":{"self":{"href":"http://xx.succeeded"}},"state":"RUNNING"}`)),
+		}
+
+		t.spyDoer.m["GET:http://xx.succeeded"] = &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(strings.NewReader(`{"links":{"self":{"href":"http://xx.succeeded"}},"state":"SUCCEEDED"}`)),
+		}
+		err := t.c.CreateTask("some-command", "some-name", "some-guid")
+		Expect(t, err).To(BeNil())
+
+		t.spyDoer.m["POST:http://some-addr.com/v3/apps/some-other-guid/tasks"] = &http.Response{
+			StatusCode: 202,
+			Body:       ioutil.NopCloser(strings.NewReader(`{"links":{"self":{"href":"http://xx.failed"}},"state":"RUNNING"}`)),
+		}
+
+		t.spyDoer.m["GET:http://xx.failed"] = &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(strings.NewReader(`{"guid":"task-guid","state":"FAILED"}`)),
+		}
+		err = t.c.CreateTask("some-command", "some-name", "some-other-guid")
+		Expect(t, err).To(Not(BeNil()))
+	})
+
 	o.Spec("it returns an error if a non-202 is received", func(t TC) {
 		t.spyDoer.m["POST:http://some-addr.com/v3/apps/some-guid/tasks"] = &http.Response{
 			StatusCode: 500,
@@ -55,7 +82,7 @@ func TestClientCreateTask(t *testing.T) {
 	})
 
 	o.Spec("it returns an error if the addr is invalid", func(t TC) {
-		t.c = capi.NewClient("::invalid", t.spyDoer)
+		t.c = capi.NewClient("::invalid", time.Millisecond, t.spyDoer)
 		err := t.c.CreateTask("some-command", "some-name", "some-guid")
 		Expect(t, err).To(Not(BeNil()))
 	})
@@ -109,7 +136,7 @@ func TestClientListTasks(t *testing.T) {
 		return TC{
 			T:       t,
 			spyDoer: spyDoer,
-			c:       capi.NewClient("http://some-addr.com", spyDoer),
+			c:       capi.NewClient("http://some-addr.com", time.Millisecond, spyDoer),
 		}
 	})
 
@@ -178,7 +205,7 @@ func (s *spyDoer) Do(req *http.Request) (*http.Response, error) {
 	if !ok {
 		return &http.Response{
 			StatusCode: 202,
-			Body:       ioutil.NopCloser(bytes.NewReader(nil)),
+			Body:       ioutil.NopCloser(strings.NewReader(`{"state":"SUCCEEDED"}`)),
 		}, s.err
 	}
 
