@@ -185,7 +185,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), nil))
 }
 
-func fetchConfigFile(SHA, filePath string, repo *git.Repo, fail, succ func(uint64), log *log.Logger) scheduler.Plans {
+func fetchConfigFile(SHA, filePath string, repo git.Repo, fail, succ func(uint64), log *log.Logger) scheduler.Plans {
 	data, err := repo.File(SHA, filePath)
 	if err != nil {
 		log.Printf("failed to find config file: %s", err)

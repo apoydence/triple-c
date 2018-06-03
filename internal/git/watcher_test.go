@@ -17,7 +17,7 @@ import (
 
 type TW struct {
 	*testing.T
-	spySHAFetcher *spySHAFetcher
+	spyRepo       *spyRepo
 	spyMetrics    *spyMetrics
 	spySHATracker *spySHATracker
 	shas          []string
@@ -42,7 +42,7 @@ func TestWatcher(t *testing.T) {
 	o.BeforeEach(func(t *testing.T) *TW {
 		return &TW{
 			T:             t,
-			spySHAFetcher: newSpySHAFetcher(),
+			spyRepo:       newSpyRepo(),
 			spyMetrics:    newSpyMetrics(),
 			spySHATracker: newSpySHATracker(),
 			mu:            &sync.Mutex{},
@@ -50,20 +50,20 @@ func TestWatcher(t *testing.T) {
 	})
 
 	o.Spec("invokes the function with the newest sha", func(t *TW) {
-		t.spySHAFetcher.errs = []error{nil, nil, nil}
-		t.spySHAFetcher.shas = []string{"sha1", "sha1", "sha2"}
+		t.spyRepo.errs = []error{nil, nil, nil}
+		t.spyRepo.shas = []string{"sha1", "sha1", "sha2"}
 		startWatcher(t)
 
 		Expect(t, t.Shas).To(ViaPolling(Equal([]string{"sha1", "sha2"})))
 
-		Expect(t, t.spySHAFetcher.Branches).To(ViaPolling(Contain("some-branch")))
+		Expect(t, t.spyRepo.Branches).To(ViaPolling(Contain("some-branch")))
 		Expect(t, t.spyMetrics.GetDelta("GitErrs")).To(ViaPolling(Equal(uint64(0))))
 		Expect(t, t.spyMetrics.GetDelta("GitReads")()).To(Not(Equal(uint64(0))))
 	})
 
 	o.Spec("stops watching when context is canceled", func(t *TW) {
-		t.spySHAFetcher.errs = []error{nil, nil, nil}
-		t.spySHAFetcher.shas = []string{"sha1", "sha1", "sha2"}
+		t.spyRepo.errs = []error{nil, nil, nil}
+		t.spyRepo.shas = []string{"sha1", "sha1", "sha2"}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
@@ -73,8 +73,8 @@ func TestWatcher(t *testing.T) {
 	})
 
 	o.Spec("it keeps track of how many errors it has encountered", func(t *TW) {
-		t.spySHAFetcher.errs = []error{errors.New("some-error")}
-		t.spySHAFetcher.shas = []string{""}
+		t.spyRepo.errs = []error{errors.New("some-error")}
+		t.spyRepo.shas = []string{""}
 
 		startWatcher(t)
 
@@ -83,8 +83,8 @@ func TestWatcher(t *testing.T) {
 	})
 
 	o.Spec("it registers with the SHA Tracker", func(t *TW) {
-		t.spySHAFetcher.errs = []error{nil, nil, nil}
-		t.spySHAFetcher.shas = []string{"sha1", "sha1", "sha2"}
+		t.spyRepo.errs = []error{nil, nil, nil}
+		t.spyRepo.shas = []string{"sha1", "sha1", "sha2"}
 
 		ctx, _ := context.WithCancel(context.Background())
 		startWatcherWithContext(ctx, t)
@@ -111,7 +111,7 @@ func startWatcherWithContext(ctx context.Context, t *TW) {
 			t.shas = append(t.shas, sha)
 		},
 		time.Millisecond,
-		t.spySHAFetcher,
+		t.spyRepo,
 		t.spySHATracker,
 		t.spyMetrics,
 		log.New(ioutil.Discard, "", 0),
@@ -129,7 +129,7 @@ func startWatcher(t *TW) {
 			t.shas = append(t.shas, sha)
 		},
 		time.Millisecond,
-		t.spySHAFetcher,
+		t.spyRepo,
 		t.spySHATracker,
 		t.spyMetrics,
 		log.New(ioutil.Discard, "", 0),
@@ -163,7 +163,9 @@ func (s *spyMetrics) GetDelta(name string) func() uint64 {
 	}
 }
 
-type spySHAFetcher struct {
+type spyRepo struct {
+	git.Repo
+
 	mu       sync.Mutex
 	branches []string
 
@@ -171,11 +173,11 @@ type spySHAFetcher struct {
 	errs []error
 }
 
-func newSpySHAFetcher() *spySHAFetcher {
-	return &spySHAFetcher{}
+func newSpyRepo() *spyRepo {
+	return &spyRepo{}
 }
 
-func (s *spySHAFetcher) SHA(branch string) (string, error) {
+func (s *spyRepo) SHA(branch string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -195,7 +197,7 @@ func (s *spySHAFetcher) SHA(branch string) (string, error) {
 	return sha, e
 }
 
-func (s *spySHAFetcher) Branches() []string {
+func (s *spyRepo) Branches() []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

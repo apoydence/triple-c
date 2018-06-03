@@ -20,7 +20,7 @@ type TR struct {
 	*testing.T
 	spyExecutor *spyExecutor
 	spyMetrics  *spyMetrics
-	r           *git.Repo
+	r           git.Repo
 	tmpDir      string
 }
 

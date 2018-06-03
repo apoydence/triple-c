@@ -42,7 +42,7 @@ type GitWatcher func(
 	branch string,
 	commit func(SHA string),
 	interval time.Duration,
-	shaFetcher git.SHAFetcher,
+	repo git.Repo,
 	shaTracker git.SHATracker,
 	m git.Metrics,
 	log *log.Logger,
@@ -65,7 +65,7 @@ type Metrics interface {
 }
 
 type RepoRegistry interface {
-	FetchRepo(path string) (*git.Repo, error)
+	FetchRepo(path string) (git.Repo, error)
 }
 
 func NewManager(

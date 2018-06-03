@@ -7,17 +7,13 @@ import (
 )
 
 type Watcher struct {
-	commit     func(SHA string)
-	shaFetcher SHAFetcher
-	branch     string
+	commit func(SHA string)
+	repo   Repo
+	branch string
 
 	gitReads func(delta uint64)
 	gitErrs  func(delta uint64)
 	log      *log.Logger
-}
-
-type SHAFetcher interface {
-	SHA(branch string) (string, error)
 }
 
 type Metrics interface {
@@ -34,7 +30,7 @@ func StartWatcher(
 	branch string,
 	commit func(SHA string),
 	interval time.Duration,
-	shaFetcher SHAFetcher,
+	repo Repo,
 	shaTracker SHATracker,
 	m Metrics,
 	log *log.Logger,
@@ -42,10 +38,10 @@ func StartWatcher(
 	tracker := shaTracker.Register(ctx, repoName, branch)
 
 	w := &Watcher{
-		commit:     commit,
-		branch:     branch,
-		shaFetcher: shaFetcher,
-		log:        log,
+		commit: commit,
+		branch: branch,
+		repo:   repo,
+		log:    log,
 
 		gitReads: m.NewCounter("GitReads"),
 		gitErrs:  m.NewCounter("GitErrs"),
@@ -70,7 +66,7 @@ func (w *Watcher) start(ctx context.Context, interval time.Duration, tracker fun
 func (w *Watcher) readSHA(lastSHA string) string {
 	w.gitReads(1)
 
-	sha, err := w.shaFetcher.SHA(w.branch)
+	sha, err := w.repo.SHA(w.branch)
 	if err != nil {
 		w.log.Printf("failed to read SHA: %s", err)
 		w.gitErrs(1)

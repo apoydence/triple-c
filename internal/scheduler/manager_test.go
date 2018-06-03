@@ -476,7 +476,7 @@ type spyGitWatcher struct {
 	branch     string
 	commit     func(SHA string)
 	interval   time.Duration
-	shaFetcher git.SHAFetcher
+	repo       git.Repo
 	shaTracker git.SHATracker
 	m          git.Metrics
 	log        *log.Logger
@@ -492,7 +492,7 @@ func (s *spyGitWatcher) StartWatcher(
 	branch string,
 	commit func(SHA string),
 	interval time.Duration,
-	shaFetcher git.SHAFetcher,
+	repo git.Repo,
 	shaTracker git.SHATracker,
 	m git.Metrics,
 	log *log.Logger,
@@ -503,7 +503,7 @@ func (s *spyGitWatcher) StartWatcher(
 	s.branch = branch
 	s.commit = commit
 	s.interval = interval
-	s.shaFetcher = shaFetcher
+	s.repo = repo
 	s.shaTracker = shaTracker
 	s.m = m
 	s.log = log
@@ -539,7 +539,7 @@ func (s *spyMetrics) GetDelta(name string) func() uint64 {
 type spyRepoRegistry struct {
 	path string
 
-	repo *git.Repo
+	repo git.Repo
 	err  error
 }
 
@@ -547,7 +547,7 @@ func newSpyRepoRegistry() *spyRepoRegistry {
 	return &spyRepoRegistry{}
 }
 
-func (s *spyRepoRegistry) FetchRepo(path string) (*git.Repo, error) {
+func (s *spyRepoRegistry) FetchRepo(path string) (git.Repo, error) {
 	s.path = path
 	return s.repo, s.err
 }

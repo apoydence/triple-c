@@ -8,7 +8,7 @@ import (
 type RepoRegistry struct {
 	mu sync.Mutex
 
-	m      map[string]*Repo
+	m      map[string]Repo
 	tmpDir string
 
 	exec    Executer
@@ -18,13 +18,13 @@ type RepoRegistry struct {
 func NewRepoRegistry(tmpDir string, e Executer, m Metrics) *RepoRegistry {
 	return &RepoRegistry{
 		tmpDir:  tmpDir,
-		m:       make(map[string]*Repo),
+		m:       make(map[string]Repo),
 		exec:    e,
 		metrics: m,
 	}
 }
 
-func (r *RepoRegistry) FetchRepo(repoPath string) (*Repo, error) {
+func (r *RepoRegistry) FetchRepo(repoPath string) (Repo, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -42,11 +42,11 @@ func (r *RepoRegistry) FetchRepo(repoPath string) (*Repo, error) {
 	return repo, nil
 }
 
-func (r *RepoRegistry) ListRepos() []*Repo {
+func (r *RepoRegistry) ListRepos() []Repo {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	var repos []*Repo
+	var repos []Repo
 	for _, k := range r.m {
 		repos = append(repos, k)
 	}

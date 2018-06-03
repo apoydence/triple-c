@@ -11,7 +11,13 @@ import (
 	"time"
 )
 
-type Repo struct {
+type Repo interface {
+	SHA(branch string) (string, error)
+	File(SHA, filePath string) (string, error)
+	ListBranches() ([]string, error)
+}
+
+type repo struct {
 	mu       sync.RWMutex
 	exec     Executer
 	repoPath string
@@ -36,10 +42,10 @@ func NewRepo(
 	interval time.Duration,
 	e Executer,
 	m Metrics,
-) (*Repo, error) {
+) (Repo, error) {
 	repoDirName := base64.RawURLEncoding.EncodeToString([]byte(repoPath))
 
-	r := &Repo{
+	r := &repo{
 		exec:     e,
 		repoPath: path.Join(tmpPath, repoDirName),
 
@@ -63,7 +69,7 @@ func NewRepo(
 	return r, nil
 }
 
-func (r *Repo) SHA(branch string) (string, error) {
+func (r repo) SHA(branch string) (string, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -83,7 +89,7 @@ func (r *Repo) SHA(branch string) (string, error) {
 	return results[0], nil
 }
 
-func (r *Repo) File(SHA, filePath string) (string, error) {
+func (r repo) File(SHA, filePath string) (string, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -99,7 +105,7 @@ func (r *Repo) File(SHA, filePath string) (string, error) {
 	return strings.Join(results, "\n"), nil
 }
 
-func (r *Repo) ListBranches() ([]string, error) {
+func (r repo) ListBranches() ([]string, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -124,7 +130,7 @@ func (r *Repo) ListBranches() ([]string, error) {
 	return branches, nil
 }
 
-func (r *Repo) start(interval time.Duration) {
+func (r repo) start(interval time.Duration) {
 	for {
 		func() {
 			defer time.Sleep(interval)
@@ -145,7 +151,7 @@ func (r *Repo) start(interval time.Duration) {
 	}
 }
 
-func (r *Repo) exists(path string) bool {
+func (r repo) exists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
