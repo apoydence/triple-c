@@ -478,7 +478,6 @@ type spyGitWatcher struct {
 	interval   time.Duration
 	repo       git.Repo
 	shaTracker git.SHATracker
-	m          git.Metrics
 	log        *log.Logger
 }
 
@@ -494,7 +493,6 @@ func (s *spyGitWatcher) StartWatcher(
 	interval time.Duration,
 	repo git.Repo,
 	shaTracker git.SHATracker,
-	m git.Metrics,
 	log *log.Logger,
 ) {
 	s.called++
@@ -505,7 +503,6 @@ func (s *spyGitWatcher) StartWatcher(
 	s.interval = interval
 	s.repo = repo
 	s.shaTracker = shaTracker
-	s.m = m
 	s.log = log
 }
 

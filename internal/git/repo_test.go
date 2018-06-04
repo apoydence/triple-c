@@ -62,6 +62,9 @@ func TestRepo(t *testing.T) {
 		Expect(t, t.spyExecutor.Commands()).To(Contain([]string{
 			"git", "rev-parse", "some-branch",
 		}))
+
+		Expect(t, t.spyMetrics.GetDelta("GitSHASuccess")()).To(Equal(uint64(1)))
+		Expect(t, t.spyMetrics.GetDelta("GitSHAFailure")()).To(Equal(uint64(0)))
 	})
 
 	o.Spec("it returns an error if fetching the SHA fails", func(t TR) {
@@ -73,6 +76,9 @@ func TestRepo(t *testing.T) {
 
 		_, err := t.r.SHA("some-branch")
 		Expect(t, err).To(Not(BeNil()))
+
+		Expect(t, t.spyMetrics.GetDelta("GitSHASuccess")()).To(Equal(uint64(0)))
+		Expect(t, t.spyMetrics.GetDelta("GitSHAFailure")()).To(Equal(uint64(1)))
 	})
 
 	o.Spec("it returns an error if fetching the SHA returns empty results", func(t TR) {
@@ -84,6 +90,9 @@ func TestRepo(t *testing.T) {
 
 		_, err := t.r.SHA("some-branch")
 		Expect(t, err).To(Not(BeNil()))
+
+		Expect(t, t.spyMetrics.GetDelta("GitSHASuccess")()).To(Equal(uint64(0)))
+		Expect(t, t.spyMetrics.GetDelta("GitSHAFailure")()).To(Equal(uint64(1)))
 	})
 
 	o.Spec("it returns the file contents", func(t TR) {
@@ -101,6 +110,9 @@ func TestRepo(t *testing.T) {
 		Expect(t, t.spyExecutor.Commands()).To(Contain([]string{
 			"git", "show", "some-sha:some-path",
 		}))
+
+		Expect(t, t.spyMetrics.GetDelta("GitFileSuccess")()).To(Equal(uint64(1)))
+		Expect(t, t.spyMetrics.GetDelta("GitFileFailure")()).To(Equal(uint64(0)))
 	})
 
 	o.Spec("it returns an error if fetching the file contents fails", func(t TR) {
@@ -112,6 +124,9 @@ func TestRepo(t *testing.T) {
 
 		_, err := t.r.File("some-sha", "some-path")
 		Expect(t, err).To(Not(BeNil()))
+
+		Expect(t, t.spyMetrics.GetDelta("GitFileSuccess")()).To(Equal(uint64(0)))
+		Expect(t, t.spyMetrics.GetDelta("GitFileFailure")()).To(Equal(uint64(1)))
 	})
 
 	o.Spec("it returns the branches", func(t TR) {
@@ -133,6 +148,9 @@ func TestRepo(t *testing.T) {
 		Expect(t, t.spyExecutor.Commands()).To(Contain([]string{
 			"git", "branch", "-a",
 		}))
+
+		Expect(t, t.spyMetrics.GetDelta("GitBranchesSuccess")()).To(Equal(uint64(1)))
+		Expect(t, t.spyMetrics.GetDelta("GitBranchesFailure")()).To(Equal(uint64(0)))
 	})
 
 	o.Spec("it returns an error if fetching the branches fails", func(t TR) {
@@ -144,6 +162,9 @@ func TestRepo(t *testing.T) {
 
 		_, err := t.r.ListBranches()
 		Expect(t, err).To(Not(BeNil()))
+
+		Expect(t, t.spyMetrics.GetDelta("GitBranchesSuccess")()).To(Equal(uint64(0)))
+		Expect(t, t.spyMetrics.GetDelta("GitBranchesFailure")()).To(Equal(uint64(1)))
 	})
 
 	o.Spec("it clones if dir doesn't yet exist", func(t TR) {
@@ -268,4 +289,31 @@ func (s *spyExecutor) Commands() [][]string {
 	r := make([][]string, len(s.commands))
 	copy(r, s.commands)
 	return r
+}
+
+type spyMetrics struct {
+	mu sync.Mutex
+	m  map[string]uint64
+}
+
+func newSpyMetrics() *spyMetrics {
+	return &spyMetrics{
+		m: make(map[string]uint64),
+	}
+}
+
+func (s *spyMetrics) NewCounter(name string) func(uint64) {
+	return func(delta uint64) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		s.m[name] += delta
+	}
+}
+
+func (s *spyMetrics) GetDelta(name string) func() uint64 {
+	return func() uint64 {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return s.m[name]
+	}
 }

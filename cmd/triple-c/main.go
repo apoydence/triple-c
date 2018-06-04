@@ -159,7 +159,6 @@ func main() {
 				time.Minute,
 				configRepo,
 				shaTracker,
-				m,
 				log,
 			)
 		}()

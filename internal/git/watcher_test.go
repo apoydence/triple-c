@@ -2,7 +2,6 @@ package git_test
 
 import (
 	"context"
-	"errors"
 	"io/ioutil"
 	"log"
 	"sync"
@@ -18,7 +17,6 @@ import (
 type TW struct {
 	*testing.T
 	spyRepo       *spyRepo
-	spyMetrics    *spyMetrics
 	spySHATracker *spySHATracker
 	shas          []string
 	mu            *sync.Mutex
@@ -43,7 +41,6 @@ func TestWatcher(t *testing.T) {
 		return &TW{
 			T:             t,
 			spyRepo:       newSpyRepo(),
-			spyMetrics:    newSpyMetrics(),
 			spySHATracker: newSpySHATracker(),
 			mu:            &sync.Mutex{},
 		}
@@ -57,8 +54,6 @@ func TestWatcher(t *testing.T) {
 		Expect(t, t.Shas).To(ViaPolling(Equal([]string{"sha1", "sha2"})))
 
 		Expect(t, t.spyRepo.Branches).To(ViaPolling(Contain("some-branch")))
-		Expect(t, t.spyMetrics.GetDelta("GitErrs")).To(ViaPolling(Equal(uint64(0))))
-		Expect(t, t.spyMetrics.GetDelta("GitReads")()).To(Not(Equal(uint64(0))))
 	})
 
 	o.Spec("stops watching when context is canceled", func(t *TW) {
@@ -70,16 +65,6 @@ func TestWatcher(t *testing.T) {
 		startWatcherWithContext(ctx, t)
 
 		Expect(t, t.Shas).To(Always(HaveLen(0)))
-	})
-
-	o.Spec("it keeps track of how many errors it has encountered", func(t *TW) {
-		t.spyRepo.errs = []error{errors.New("some-error")}
-		t.spyRepo.shas = []string{""}
-
-		startWatcher(t)
-
-		Expect(t, t.spyMetrics.GetDelta("GitErrs")).To(ViaPolling(Equal(uint64(1))))
-		Expect(t, t.spyMetrics.GetDelta("GitReads")()).To(Not(Equal(uint64(0))))
 	})
 
 	o.Spec("it registers with the SHA Tracker", func(t *TW) {
@@ -113,7 +98,6 @@ func startWatcherWithContext(ctx context.Context, t *TW) {
 		time.Millisecond,
 		t.spyRepo,
 		t.spySHATracker,
-		t.spyMetrics,
 		log.New(ioutil.Discard, "", 0),
 	)
 }
@@ -131,36 +115,8 @@ func startWatcher(t *TW) {
 		time.Millisecond,
 		t.spyRepo,
 		t.spySHATracker,
-		t.spyMetrics,
 		log.New(ioutil.Discard, "", 0),
 	)
-}
-
-type spyMetrics struct {
-	mu sync.Mutex
-	m  map[string]uint64
-}
-
-func newSpyMetrics() *spyMetrics {
-	return &spyMetrics{
-		m: make(map[string]uint64),
-	}
-}
-
-func (s *spyMetrics) NewCounter(name string) func(uint64) {
-	return func(delta uint64) {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		s.m[name] += delta
-	}
-}
-
-func (s *spyMetrics) GetDelta(name string) func() uint64 {
-	return func() uint64 {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		return s.m[name]
-	}
 }
 
 type spyRepo struct {

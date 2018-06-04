@@ -44,7 +44,6 @@ type GitWatcher func(
 	interval time.Duration,
 	repo git.Repo,
 	shaTracker git.SHATracker,
-	m git.Metrics,
 	log *log.Logger,
 )
 
@@ -135,7 +134,6 @@ func (m *Manager) Add(t MetaPlan) {
 			time.Minute,
 			repo,
 			m.shaTracker,
-			m.m,
 			m.log,
 		)
 	}

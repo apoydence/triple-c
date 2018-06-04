@@ -24,6 +24,15 @@ type repo struct {
 
 	gitFetchSuccess func(uint64)
 	gitFetchFail    func(uint64)
+
+	gitSHASuccess func(uint64)
+	gitSHAFailure func(uint64)
+
+	gitFileSuccess func(uint64)
+	gitFileFailure func(uint64)
+
+	gitBranchesSuccess func(uint64)
+	gitBranchesFailure func(uint64)
 }
 
 type Executer interface {
@@ -34,6 +43,10 @@ type ExecutorFunc func(path string, commands ...string) ([]string, error)
 
 func (f ExecutorFunc) Run(path string, commands ...string) ([]string, error) {
 	return f(path, commands...)
+}
+
+type Metrics interface {
+	NewCounter(name string) func(delta uint64)
 }
 
 func NewRepo(
@@ -49,8 +62,14 @@ func NewRepo(
 		exec:     e,
 		repoPath: path.Join(tmpPath, repoDirName),
 
-		gitFetchSuccess: m.NewCounter("GitFetchAllSuccess"),
-		gitFetchFail:    m.NewCounter("GitFetchAllFailure"),
+		gitFetchSuccess:    m.NewCounter("GitFetchAllSuccess"),
+		gitFetchFail:       m.NewCounter("GitFetchAllFailure"),
+		gitSHASuccess:      m.NewCounter("GitSHASuccess"),
+		gitSHAFailure:      m.NewCounter("GitSHAFailure"),
+		gitFileSuccess:     m.NewCounter("GitFileSuccess"),
+		gitFileFailure:     m.NewCounter("GitFileFailure"),
+		gitBranchesSuccess: m.NewCounter("GitBranchesSuccess"),
+		gitBranchesFailure: m.NewCounter("GitBranchesFailure"),
 	}
 
 	if !r.exists(r.repoPath) {
@@ -79,13 +98,16 @@ func (r repo) SHA(branch string) (string, error) {
 	)
 
 	if err != nil {
+		r.gitSHAFailure(1)
 		return "", fmt.Errorf("|%s| %s: %s", r.repoPath, branch, err)
 	}
 
 	if len(results) == 0 {
+		r.gitSHAFailure(1)
 		return "", errors.New("empty results")
 	}
 
+	r.gitSHASuccess(1)
 	return results[0], nil
 }
 
@@ -99,9 +121,11 @@ func (r repo) File(SHA, filePath string) (string, error) {
 	)
 
 	if err != nil {
+		r.gitFileFailure(1)
 		return "", err
 	}
 
+	r.gitFileSuccess(1)
 	return strings.Join(results, "\n"), nil
 }
 
@@ -115,6 +139,7 @@ func (r repo) ListBranches() ([]string, error) {
 	)
 
 	if err != nil {
+		r.gitBranchesFailure(1)
 		return nil, err
 	}
 
@@ -127,6 +152,7 @@ func (r repo) ListBranches() ([]string, error) {
 		branches = append(branches, result)
 	}
 
+	r.gitBranchesSuccess(1)
 	return branches, nil
 }
 
