@@ -91,8 +91,6 @@ func (c *Client) CreateTask(
 		}
 		resp.Body.Close()
 
-		fmt.Println(results)
-
 		switch results.State {
 		case "RUNNING":
 			time.Sleep(c.interval)

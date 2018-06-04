@@ -23,6 +23,8 @@ type Plan struct {
 
 type Task struct {
 	Name        string            `yaml:"name"`
+	Input       string            `yaml:"input"`
+	Output      string            `yaml:"output"`
 	Command     string            `yaml:"command"`
 	Parameters  map[string]string `yaml:"parameters"`
 	BranchGuard string            `yaml:"branch_guard"`

@@ -105,6 +105,13 @@ func main() {
 		log.Fatalf("failed to get config repo (%s): %s", cfg.RepoPath, err)
 	}
 
+	dataDir, err := ioutil.TempDir(cfg.DataDir, "triple-c")
+	if err != nil {
+		log.Fatalf("failed to create data dir in %s: %s", cfg.DataDir, err)
+	}
+
+	transfer := handlers.NewTransfer(cfg.VcapApplication.ApplicationURIs[0], dataDir, log)
+
 	startBranch := func(ctx context.Context, branch string) {
 		go func() {
 			log.Printf("Watching branch %s", branch)
@@ -117,6 +124,7 @@ func main() {
 				repoRegistry,
 				os.LookupEnv,
 				shaTracker,
+				transfer,
 				m,
 				log,
 			)
@@ -180,6 +188,7 @@ func main() {
 
 	repoHandler := handlers.NewRepos(shaTracker, log)
 	http.Handle("/v1/repos", repoHandler)
+	http.Handle("/v1/transfer/", transfer)
 
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), nil))
 }

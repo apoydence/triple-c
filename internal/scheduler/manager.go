@@ -28,6 +28,7 @@ type Manager struct {
 
 	taskCreator TaskCreator
 	shaTracker  git.SHATracker
+	transfer    Transfer
 
 	startWatcher GitWatcher
 	repoRegistry RepoRegistry
@@ -67,6 +68,10 @@ type RepoRegistry interface {
 	FetchRepo(path string) (git.Repo, error)
 }
 
+type Transfer interface {
+	InitInterconnect(ctx context.Context) string
+}
+
 func NewManager(
 	ctx context.Context,
 	appGuid string,
@@ -76,6 +81,7 @@ func NewManager(
 	repoRegistry RepoRegistry,
 	ps ParameterStore,
 	shaTracker git.SHATracker,
+	transfer Transfer,
 	m Metrics,
 	log *log.Logger,
 ) *Manager {
@@ -96,6 +102,7 @@ func NewManager(
 
 		shaTracker:  shaTracker,
 		taskCreator: tc,
+		transfer:    transfer,
 
 		successfulTasks: successfulTasks,
 		failedTasks:     failedTasks,
@@ -159,19 +166,55 @@ func (m *Manager) startPlanForSHA(SHA string, t MetaPlan, taskLock *sync.Mutex) 
 	taskLock.Lock()
 	defer taskLock.Unlock()
 
+	var inputs, outputs []ioAddr
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	for taskIndex, task := range t.Tasks {
+		if taskIndex == 0 {
+			inputs = append(inputs, ioAddr{})
+		} else if outputs[taskIndex-1].ioAddr != "" {
+			inputs = append(inputs, ioAddr{
+				ioAddr:   outputs[taskIndex-1].ioAddr,
+				name:     task.Input,
+				fromName: outputs[taskIndex-1].name,
+			})
+		} else if task.Input != "" {
+			m.log.Fatalf("mismatch for inputs and outputs: %+v", task)
+		} else {
+			inputs = append(inputs, ioAddr{})
+		}
+
+		if task.Output == "" {
+			outputs = append(outputs, ioAddr{})
+		} else {
+			outputs = append(outputs, ioAddr{
+				ioAddr: m.transfer.InitInterconnect(ctx),
+				name:   task.Output,
+			})
+		}
+	}
+
 	for taskIndex, task := range t.Tasks {
 		if task.BranchGuard != "" && task.BranchGuard != m.branch {
 			m.log.Printf("skipping task for %s on branch %s (BranchGuard %s)", SHA, m.branch, task.BranchGuard)
 			continue
 		}
 
-		if !m.startTaskForSHA(SHA, task, t, taskIndex) {
+		if !m.startTaskForSHA(SHA, task, t, taskIndex, inputs[taskIndex], outputs[taskIndex]) {
 			return
 		}
 	}
 }
 
-func (m *Manager) startTaskForSHA(SHA string, task Task, t MetaPlan, taskIndex int) bool {
+type ioAddr struct {
+	ioAddr   string
+	name     string
+	fromName string
+}
+
+func (m *Manager) startTaskForSHA(SHA string, task Task, t MetaPlan, taskIndex int, input, output ioAddr) bool {
 	m.log.Printf("starting task for %s on branch %s", SHA, m.branch)
 	defer m.log.Printf("done with task for %s on branch %s", SHA, m.branch)
 
@@ -190,7 +233,7 @@ func (m *Manager) startTaskForSHA(SHA string, task Task, t MetaPlan, taskIndex i
 	}
 
 	err = m.taskCreator.CreateTask(
-		m.fetchRepo(t, task, m.branch, m.ps),
+		m.fetchRepo(t, task, m.branch, m.ps, input, output),
 		base64.StdEncoding.EncodeToString(name),
 		m.appGuid,
 	)
@@ -278,7 +321,7 @@ func encodePlan(p MetaPlan) encodedTask {
 }
 
 // fetchRepo adds the cloning of a repo to the given command
-func (m *Manager) fetchRepo(p MetaPlan, t Task, branch string, ps ParameterStore) string {
+func (m *Manager) fetchRepo(p MetaPlan, t Task, branch string, ps ParameterStore, input, output ioAddr) string {
 	var parameters string
 	for k, v := range t.Parameters {
 		if !strings.HasPrefix(v, "((") || !strings.HasSuffix(v, "))") {
@@ -318,18 +361,68 @@ set +x
 		)
 	}
 
+	var gatherInput string
+	if input.ioAddr != "" {
+		gatherInput = fmt.Sprintf(`
+set -ex
+pushd /home/vcap/app
+  wget %s -O input.tgz --quiet
+  ls -alh
+  tar -xzf input.tgz
+  if [ '%s' != '%s' ]; then
+    mv %s %s
+  fi
+popd
+set +ex
+`, input.ioAddr, input.fromName, input.name, input.fromName, input.name)
+	}
+
+	var gatherOutput, mkOutput string
+	if output.ioAddr != "" {
+		gatherOutput = fmt.Sprintf(`
+set -e
+pushd /home/vcap/app
+  tar -czf output.tgz %s
+  ls -alh
+  curl -s -X POST %s --data-binary @output.tgz
+popd
+set +e
+`, output.name, output.ioAddr)
+
+		mkOutput = fmt.Sprintf(`
+set -e
+pushd /home/vcap/app
+	mkdir %s
+popd
+set +e
+`, output.name)
+	}
+
 	return fmt.Sprintf(`#!/bin/bash
 set -ex
 
+# Clones
+%s
+
+# Input
 %s
 
 # Parameters
 %s
 
+# Make output dirs
+%s
+
+%s
+
+# Output
 %s
 	`,
 		clones,
+		gatherInput,
 		parameters,
+		mkOutput,
 		t.Command,
+		gatherOutput,
 	)
 }

@@ -24,6 +24,7 @@ type TM struct {
 	spyGitWatcher   *spyGitWatcher
 	spyMetrics      *spyMetrics
 	spyRepoRegistry *spyRepoRegistry
+	spyTransfer     *spyTransfer
 	m               *scheduler.Manager
 }
 
@@ -37,12 +38,14 @@ func TestManager(t *testing.T) {
 		spyTaskCreator := newSpyTaskCreator()
 		spyGitWatcher := newSpyGitWatcher()
 		spyRepoRegistry := newSpyRepoRegistry()
+		spyTransfer := newSpyTransfer()
 		return TM{
 			T:               t,
 			spyMetrics:      spyMetrics,
 			spyGitWatcher:   spyGitWatcher,
 			spyTaskCreator:  spyTaskCreator,
 			spyRepoRegistry: spyRepoRegistry,
+			spyTransfer:     spyTransfer,
 
 			m: scheduler.NewManager(
 				context.Background(),
@@ -58,6 +61,7 @@ func TestManager(t *testing.T) {
 					return "", false
 				},
 				nil,
+				spyTransfer,
 				spyMetrics,
 				log.New(ioutil.Discard, "", 0),
 			),
@@ -184,6 +188,27 @@ func TestManager(t *testing.T) {
 
 		t.spyGitWatcher.commit("some-sha")
 		Expect(t, t.spyTaskCreator.command).To(Not(ContainSubstring("some-other-command")))
+		Expect(t, t.spyTransfer.ctx).To(BeNil())
+	})
+
+	o.Spec("it uses the transfer to get a name", func(t TM) {
+		t.m.Add(scheduler.MetaPlan{
+			Plan: scheduler.Plan{
+				RepoPaths: map[string]string{"some-repo": "some-path"},
+				Tasks: []scheduler.Task{
+					{
+						Output:  "some-out",
+						Command: "some-command",
+					},
+					{
+						Command: "some-other-command",
+					},
+				},
+			},
+		})
+
+		t.spyGitWatcher.commit("some-sha")
+		Expect(t, t.spyTransfer.ctx).To(Not(BeNil()))
 	})
 
 	o.Spec("it starts a task once if the DoOnce is set", func(t TM) {
@@ -547,4 +572,18 @@ func newSpyRepoRegistry() *spyRepoRegistry {
 func (s *spyRepoRegistry) FetchRepo(path string) (git.Repo, error) {
 	s.path = path
 	return s.repo, s.err
+}
+
+type spyTransfer struct {
+	ctx    context.Context
+	result string
+}
+
+func newSpyTransfer() *spyTransfer {
+	return &spyTransfer{}
+}
+
+func (s *spyTransfer) InitInterconnect(ctx context.Context) string {
+	s.ctx = ctx
+	return s.result
 }

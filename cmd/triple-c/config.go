@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Port            uint16          `env:"PORT, required, report"`
 	VcapApplication VcapApplication `env:"VCAP_APPLICATION, required"`
+	DataDir         string          `env:"DATA_DIR"`
 
 	ClientID          string `env:"CLIENT_ID, required"`
 	RefreshToken      string `env:"REFRESH_TOKEN, required"`
@@ -23,8 +24,9 @@ type Config struct {
 }
 
 type VcapApplication struct {
-	CAPIAddr      string `json:"cf_api"`
-	ApplicationID string `json:"application_id"`
+	CAPIAddr        string   `json:"cf_api"`
+	ApplicationID   string   `json:"application_id"`
+	ApplicationURIs []string `json:"application_uris"`
 }
 
 func (a *VcapApplication) UnmarshalEnv(data string) error {
@@ -33,7 +35,8 @@ func (a *VcapApplication) UnmarshalEnv(data string) error {
 
 func LoadConfig() (Config, error) {
 	cfg := Config{
-		Port: 8080,
+		Port:    8080,
+		DataDir: "/dev/shm",
 	}
 
 	if err := envstruct.Load(&cfg); err != nil {
