@@ -138,7 +138,7 @@ func (m *Manager) Add(t MetaPlan) {
 			func(SHA string) {
 				m.startPlanForSHA(SHA, t, &taskLock)
 			},
-			time.Minute,
+			15*time.Second,
 			repo,
 			m.shaTracker,
 			m.log,

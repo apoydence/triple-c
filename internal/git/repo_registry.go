@@ -33,7 +33,7 @@ func (r *RepoRegistry) FetchRepo(repoPath string) (Repo, error) {
 		return repo, nil
 	}
 
-	repo, err := NewRepo(repoPath, r.tmpDir, time.Minute, r.exec, r.metrics)
+	repo, err := NewRepo(repoPath, r.tmpDir, 15*time.Second, r.exec, r.metrics)
 	if err != nil {
 		return nil, err
 	}

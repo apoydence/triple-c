@@ -44,7 +44,7 @@ plans:
 
   - name: CD
     input: binary
-    branch_guard: remotes/origin/master
+    branch_guard: remotes/origin/develop
     parameters:
       CF_SYSTEM_DOMAIN: ((CF_SYSTEM_DOMAIN))
       CF_USERNAME: ((CF_USERNAME))
@@ -52,6 +52,7 @@ plans:
       CF_SPACE: ((CF_SPACE))
       CF_ORG: ((CF_ORG))
       CF_APP_NAME: ((CF_APP_NAME))
+      SSH_KEY: ((BOT_SSH_KEY))
     command: |
       set -ex
 
@@ -83,3 +84,21 @@ plans:
           cf push $CF_APP_NAME &> /dev/null
         popd
       fi
+
+      # Merge into master
+      mkdir -p $HOME/.ssh/
+      echo -e "$BOT_SSH_KEY" > $HOME/.ssh/bot_key
+      chmod 600 $HOME/.ssh/bot_key
+
+      pushd triple-c
+        git remote set-url origin git@github.com:apoydence/triple-c.git
+        git checkout master
+        git merge origin/develop --ff-only
+        git config --global push.default simple
+
+        # Containers might have an old version of git. This works with older
+        # versions.
+        echo 'ssh -i ~/.ssh/bot_key -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $*' > ssh
+        chmod +x ssh
+        GIT_SSH='./ssh' git push
+      popd
