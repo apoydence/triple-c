@@ -124,19 +124,24 @@ func (m *Manager) Add(t MetaPlan) {
 	var taskLock sync.Mutex
 
 	for _, repoPath := range t.RepoPaths {
-		repo, err := m.repoRegistry.FetchRepo(repoPath)
+		repo, err := m.repoRegistry.FetchRepo(repoPath.Repo)
 		if err != nil {
 			m.log.Printf("failed to fetch repo %s: %s", repoPath, err)
 			m.failedRepos(1)
 			return
 		}
 
+		branch := repoPath.Branch
+		if repoPath.Branch == "" {
+			branch = m.branch
+		}
+
 		m.startWatcher(
 			ctx,
-			repoPath,
-			m.branch,
+			repoPath.Repo,
+			branch,
 			func(SHA string) {
-				m.startPlanForSHA(SHA, t, &taskLock)
+				m.startPlanForSHA(SHA, branch, t, &taskLock)
 			},
 			15*time.Second,
 			repo,
@@ -146,19 +151,19 @@ func (m *Manager) Add(t MetaPlan) {
 	}
 }
 
-func (m *Manager) startPlanForSHA(SHA string, t MetaPlan, taskLock *sync.Mutex) {
+func (m *Manager) startPlanForSHA(SHA, branch string, t MetaPlan, taskLock *sync.Mutex) {
 	if !m.checkAndRemove(t, t.DoOnce) {
 		return
 	}
 
-	dupe, err := m.duplicate(m.branch, SHA)
+	dupe, err := m.duplicate(branch, SHA)
 	if err != nil {
 		m.log.Printf("failed deduping tasks: %s", err)
 		return
 	}
 
 	if dupe {
-		m.log.Printf("skipping task for %s on branch %s", SHA, m.branch)
+		m.log.Printf("skipping task for %s on branch %s", SHA, branch)
 		m.dedupedTasks(1)
 		return
 	}
@@ -197,12 +202,12 @@ func (m *Manager) startPlanForSHA(SHA string, t MetaPlan, taskLock *sync.Mutex) 
 	}
 
 	for taskIndex, task := range t.Tasks {
-		if task.BranchGuard != "" && task.BranchGuard != m.branch {
-			m.log.Printf("skipping task for %s on branch %s (BranchGuard %s)", SHA, m.branch, task.BranchGuard)
+		if task.BranchGuard != "" && task.BranchGuard != branch {
+			m.log.Printf("skipping task for %s on branch %s (BranchGuard %s)", SHA, branch, task.BranchGuard)
 			continue
 		}
 
-		if !m.startTaskForSHA(SHA, task, t, taskIndex, inputs[taskIndex], outputs[taskIndex]) {
+		if !m.startTaskForSHA(SHA, branch, task, t, taskIndex, inputs[taskIndex], outputs[taskIndex]) {
 			return
 		}
 	}
@@ -214,9 +219,9 @@ type ioAddr struct {
 	fromName string
 }
 
-func (m *Manager) startTaskForSHA(SHA string, task Task, t MetaPlan, taskIndex int, input, output ioAddr) bool {
-	m.log.Printf("starting task for %s on branch %s", SHA, m.branch)
-	defer m.log.Printf("done with task for %s on branch %s", SHA, m.branch)
+func (m *Manager) startTaskForSHA(SHA, branch string, task Task, t MetaPlan, taskIndex int, input, output ioAddr) bool {
+	m.log.Printf("starting task for %s on branch %s", SHA, branch)
+	defer m.log.Printf("done with task for %s on branch %s", SHA, branch)
 
 	name, err := json.Marshal(struct {
 		SHA       string `json:"sha"`
@@ -224,7 +229,7 @@ func (m *Manager) startTaskForSHA(SHA string, task Task, t MetaPlan, taskIndex i
 		TaskIndex int    `json:"task_index"`
 	}{
 		SHA:       SHA,
-		Branch:    m.branch,
+		Branch:    branch,
 		TaskIndex: taskIndex,
 	})
 	if err != nil {
@@ -233,7 +238,7 @@ func (m *Manager) startTaskForSHA(SHA string, task Task, t MetaPlan, taskIndex i
 	}
 
 	err = m.taskCreator.CreateTask(
-		m.fetchRepo(t, task, m.branch, m.ps, input, output),
+		m.fetchRepo(t, task, branch, m.ps, input, output),
 		base64.StdEncoding.EncodeToString(name),
 		m.appGuid,
 	)
@@ -243,7 +248,7 @@ func (m *Manager) startTaskForSHA(SHA string, task Task, t MetaPlan, taskIndex i
 		return false
 	}
 
-	m.log.Printf("task for %s on branch %s succeeded", SHA, m.branch)
+	m.log.Printf("task for %s on branch %s succeeded", SHA, branch)
 	m.successfulTasks(1)
 	return true
 }
@@ -306,7 +311,7 @@ func encodePlan(p MetaPlan) encodedTask {
 	}
 
 	for k, v := range p.RepoPaths {
-		parameters = append(parameters, k, v)
+		parameters = append(parameters, k, v.Repo, v.Branch)
 	}
 
 	for _, t := range p.Tasks {
@@ -337,6 +342,12 @@ func (m *Manager) fetchRepo(p MetaPlan, t Task, branch string, ps ParameterStore
 
 	var clones string
 	for _, repoPath := range p.RepoPaths {
+
+		b := repoPath.Branch
+		if repoPath.Branch == "" {
+			b = branch
+		}
+
 		clones = fmt.Sprintf(`
 %s
 rm -rf %s
@@ -354,10 +365,10 @@ popd
 set +x
 `,
 			clones,
-			path.Base(repoPath),
-			repoPath,
-			path.Base(repoPath),
-			branch,
+			path.Base(repoPath.Repo),
+			repoPath.Repo,
+			path.Base(repoPath.Repo),
+			b,
 		)
 	}
 

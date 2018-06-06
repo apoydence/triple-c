@@ -71,7 +71,7 @@ func TestManager(t *testing.T) {
 	o.Spec("it starts a task when a commit comes through", func(t TM) {
 		t.m.Add(scheduler.MetaPlan{
 			Plan: scheduler.Plan{
-				RepoPaths: map[string]string{"some-repo": "some-path"},
+				RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path", Branch: "branch-b"}},
 				Tasks: []scheduler.Task{
 					{
 						Command: "some-command",
@@ -81,7 +81,7 @@ func TestManager(t *testing.T) {
 		})
 
 		Expect(t, t.spyGitWatcher.commit).To(Not(BeNil()))
-		Expect(t, t.spyGitWatcher.branch).To(Equal("some-branch"))
+		Expect(t, t.spyGitWatcher.branch).To(Equal("branch-b"))
 		Expect(t, t.spyGitWatcher.repoName).To(Equal("some-path"))
 
 		t.spyGitWatcher.commit("some-sha")
@@ -94,7 +94,7 @@ func TestManager(t *testing.T) {
 		var m map[string]interface{}
 		Expect(t, json.Unmarshal(dataName, &m)).To(BeNil())
 		Expect(t, m["sha"]).To(Equal("some-sha"))
-		Expect(t, m["branch"]).To(Equal("some-branch"))
+		Expect(t, m["branch"]).To(Equal("branch-b"))
 		Expect(t, m["task_index"]).To(Equal(0.0))
 
 		Expect(t, t.spyMetrics.GetDelta("SuccessfulTasks")()).To(Equal(uint64(1)))
@@ -104,7 +104,7 @@ func TestManager(t *testing.T) {
 	o.Spec("it guards for certain branches", func(t TM) {
 		t.m.Add(scheduler.MetaPlan{
 			Plan: scheduler.Plan{
-				RepoPaths: map[string]string{"some-repo": "some-path"},
+				RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}},
 				Tasks: []scheduler.Task{
 					{
 						Command:     "some-other-command",
@@ -131,7 +131,7 @@ func TestManager(t *testing.T) {
 	o.Spec("it handles multiple RepoPaths", func(t TM) {
 		t.m.Add(scheduler.MetaPlan{
 			Plan: scheduler.Plan{
-				RepoPaths: map[string]string{"some-repo-path": "some-path", "some-other-repo": "some-other-path"},
+				RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}, "some-other-repo": scheduler.Repo{Repo: "some-other-path"}},
 				Tasks: []scheduler.Task{
 					{
 						Command: "some-command",
@@ -146,7 +146,7 @@ func TestManager(t *testing.T) {
 	o.Spec("it starts the next task", func(t TM) {
 		t.m.Add(scheduler.MetaPlan{
 			Plan: scheduler.Plan{
-				RepoPaths: map[string]string{"some-repo": "some-path"},
+				RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}},
 				Tasks: []scheduler.Task{
 					{
 						Command: "some-command",
@@ -170,7 +170,7 @@ func TestManager(t *testing.T) {
 		t.spyTaskCreator.err = errors.New("some-error")
 		t.m.Add(scheduler.MetaPlan{
 			Plan: scheduler.Plan{
-				RepoPaths: map[string]string{"some-repo": "some-path"},
+				RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}},
 				Tasks: []scheduler.Task{
 					{
 						Command: "some-command",
@@ -194,7 +194,7 @@ func TestManager(t *testing.T) {
 	o.Spec("it uses the transfer to get a name", func(t TM) {
 		t.m.Add(scheduler.MetaPlan{
 			Plan: scheduler.Plan{
-				RepoPaths: map[string]string{"some-repo": "some-path"},
+				RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}},
 				Tasks: []scheduler.Task{
 					{
 						Output:  "some-out",
@@ -214,7 +214,7 @@ func TestManager(t *testing.T) {
 	o.Spec("it starts a task once if the DoOnce is set", func(t TM) {
 		t.m.Add(scheduler.MetaPlan{
 			Plan: scheduler.Plan{
-				RepoPaths: map[string]string{"some-repo": "some-path"},
+				RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}},
 				Tasks: []scheduler.Task{
 					{
 						Command: "some-command",
@@ -235,7 +235,7 @@ func TestManager(t *testing.T) {
 	o.Spec("it starts a task multiple times if the DoOnce is not set", func(t TM) {
 		t.m.Add(scheduler.MetaPlan{
 			Plan: scheduler.Plan{
-				RepoPaths: map[string]string{"some-repo": "some-path"},
+				RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}},
 				Tasks: []scheduler.Task{
 					{
 						Command: "some-command",
@@ -256,7 +256,7 @@ func TestManager(t *testing.T) {
 	o.Spec("it sets the given environment variables", func(t TM) {
 		t.m.Add(scheduler.MetaPlan{
 			Plan: scheduler.Plan{
-				RepoPaths: map[string]string{"some-repo": "some-path"},
+				RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}},
 				Tasks: []scheduler.Task{
 					{
 						Command: "some-command",
@@ -287,7 +287,7 @@ func TestManager(t *testing.T) {
 	o.Spec("it does not start a task when a commit comes through but there is a task for it already", func(t TM) {
 		t.m.Add(scheduler.MetaPlan{
 			Plan: scheduler.Plan{
-				RepoPaths: map[string]string{"some-repo": "some-path"},
+				RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}},
 				Tasks: []scheduler.Task{
 					{
 						Command: "some-command",
@@ -312,7 +312,7 @@ func TestManager(t *testing.T) {
 	o.Spec("it does not dedupe commits on different branches", func(t TM) {
 		t.m.Add(scheduler.MetaPlan{
 			Plan: scheduler.Plan{
-				RepoPaths: map[string]string{"some-repo": "some-path"},
+				RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}},
 				Tasks: []scheduler.Task{
 					{
 						Command: "some-command",
@@ -337,7 +337,7 @@ func TestManager(t *testing.T) {
 		t.spyTaskCreator.err = errors.New("some-error")
 		t.m.Add(scheduler.MetaPlan{
 			Plan: scheduler.Plan{
-				RepoPaths: map[string]string{"some-repo": "some-path"},
+				RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}},
 				Tasks: []scheduler.Task{
 					{
 						Command: "some-command",
@@ -356,7 +356,7 @@ func TestManager(t *testing.T) {
 		t.spyRepoRegistry.err = errors.New("some-err")
 		t.m.Add(scheduler.MetaPlan{
 			Plan: scheduler.Plan{
-				RepoPaths: map[string]string{"some-repo": "some-path"},
+				RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}},
 				Tasks: []scheduler.Task{
 					{
 						Command: "some-command",
@@ -372,7 +372,7 @@ func TestManager(t *testing.T) {
 	o.Spec("it cancels the context when a task is removed", func(t TM) {
 		t.m.Add(scheduler.MetaPlan{
 			Plan: scheduler.Plan{
-				RepoPaths: map[string]string{"some-repo": "some-path"},
+				RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}},
 				Tasks: []scheduler.Task{
 					{
 						Command: "some-command",
@@ -383,7 +383,7 @@ func TestManager(t *testing.T) {
 
 		t.m.Remove(scheduler.MetaPlan{
 			Plan: scheduler.Plan{
-				RepoPaths: map[string]string{"some-repo": "some-path"},
+				RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}},
 				Tasks: []scheduler.Task{
 					{
 						Command: "some-command",
@@ -402,7 +402,7 @@ func TestManager(t *testing.T) {
 		Expect(t, func() {
 			t.m.Remove(scheduler.MetaPlan{
 				Plan: scheduler.Plan{
-					RepoPaths: map[string]string{"some-repo": "some-path"},
+					RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}},
 					Tasks: []scheduler.Task{
 						{
 							Command: "some-command",
@@ -418,7 +418,7 @@ func TestManager(t *testing.T) {
 			for i := 0; i < 100; i++ {
 				t.m.Add(scheduler.MetaPlan{
 					Plan: scheduler.Plan{
-						RepoPaths: map[string]string{"some-repo": "some-path"},
+						RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}},
 						Tasks: []scheduler.Task{
 							{
 								Command: "some-command",
@@ -434,7 +434,7 @@ func TestManager(t *testing.T) {
 				for i := 0; i < 100; i++ {
 					t.m.Remove(scheduler.MetaPlan{
 						Plan: scheduler.Plan{
-							RepoPaths: map[string]string{"some-repo": "some-path"},
+							RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}},
 							Tasks: []scheduler.Task{
 								{
 									Command: "some-command",
@@ -448,7 +448,7 @@ func TestManager(t *testing.T) {
 
 		t.m.Add(scheduler.MetaPlan{
 			Plan: scheduler.Plan{
-				RepoPaths: map[string]string{"some-repo": "some-path"},
+				RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}},
 				Tasks: []scheduler.Task{
 					{
 						Command: "some-command",

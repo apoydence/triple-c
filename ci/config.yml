@@ -3,7 +3,8 @@
 plans:
 - name: triple-c's CI/CD
   repo_paths:
-    triple-c: https://github.com/apoydence/triple-c
+    triple-c:
+      repo: https://github.com/apoydence/triple-c
   tasks:
   - name: CI
     output: binary

@@ -7,9 +7,10 @@ import (
 )
 
 type Watcher struct {
-	commit func(SHA string)
-	repo   Repo
-	branch string
+	commit   func(SHA string)
+	repo     Repo
+	repoName string
+	branch   string
 
 	log *log.Logger
 }
@@ -31,10 +32,11 @@ func StartWatcher(
 	tracker := shaTracker.Register(ctx, repoName, branch)
 
 	w := &Watcher{
-		commit: commit,
-		branch: branch,
-		repo:   repo,
-		log:    log,
+		commit:   commit,
+		repoName: repoName,
+		branch:   branch,
+		repo:     repo,
+		log:      log,
 	}
 
 	go w.start(ctx, interval, tracker)
@@ -56,7 +58,7 @@ func (w *Watcher) start(ctx context.Context, interval time.Duration, tracker fun
 func (w *Watcher) readSHA(lastSHA string) string {
 	sha, err := w.repo.SHA(w.branch)
 	if err != nil {
-		w.log.Printf("failed to read SHA: %s", err)
+		w.log.Printf("failed to read SHA for %s on %s: %s", w.repoName, w.branch, err)
 		return lastSHA
 	}
 

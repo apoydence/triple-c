@@ -34,13 +34,13 @@ func TestScheduler(t *testing.T) {
 		t.s.SetPlans([]scheduler.MetaPlan{
 			{
 				Plan: scheduler.Plan{
-					RepoPaths: map[string]string{"repo-a": "a"},
+					RepoPaths: map[string]scheduler.Repo{"repo-a": scheduler.Repo{Repo: "a"}},
 					Tasks:     []scheduler.Task{},
 				},
 			},
 			{
 				Plan: scheduler.Plan{
-					RepoPaths: map[string]string{"repo-b": "b"},
+					RepoPaths: map[string]scheduler.Repo{"repo-b": scheduler.Repo{Repo: "b"}},
 					Tasks:     []scheduler.Task{},
 				},
 			},
@@ -50,13 +50,13 @@ func TestScheduler(t *testing.T) {
 		Expect(t, t.spyTaskManager.adds).To(Contain(
 			scheduler.MetaPlan{
 				Plan: scheduler.Plan{
-					RepoPaths: map[string]string{"repo-a": "a"},
+					RepoPaths: map[string]scheduler.Repo{"repo-a": scheduler.Repo{Repo: "a"}},
 					Tasks:     []scheduler.Task{},
 				},
 			},
 			scheduler.MetaPlan{
 				Plan: scheduler.Plan{
-					RepoPaths: map[string]string{"repo-b": "b"},
+					RepoPaths: map[string]scheduler.Repo{"repo-b": scheduler.Repo{Repo: "b"}},
 					Tasks:     []scheduler.Task{},
 				},
 			},
@@ -67,7 +67,7 @@ func TestScheduler(t *testing.T) {
 		t.s.SetPlans([]scheduler.MetaPlan{
 			{
 				Plan: scheduler.Plan{
-					RepoPaths: map[string]string{"repo-a": "a"},
+					RepoPaths: map[string]scheduler.Repo{"repo-a": scheduler.Repo{Repo: "a"}},
 					Tasks:     []scheduler.Task{},
 				},
 			},
@@ -75,7 +75,7 @@ func TestScheduler(t *testing.T) {
 		t.s.SetPlans([]scheduler.MetaPlan{
 			{
 				Plan: scheduler.Plan{
-					RepoPaths: map[string]string{"repo-a": "a"},
+					RepoPaths: map[string]scheduler.Repo{"repo-a": scheduler.Repo{Repo: "a"}},
 					Tasks:     []scheduler.Task{},
 				},
 			},
@@ -85,7 +85,7 @@ func TestScheduler(t *testing.T) {
 		Expect(t, t.spyTaskManager.adds).To(Contain(
 			scheduler.MetaPlan{
 				Plan: scheduler.Plan{
-					RepoPaths: map[string]string{"repo-a": "a"},
+					RepoPaths: map[string]scheduler.Repo{"repo-a": scheduler.Repo{Repo: "a"}},
 					Tasks:     []scheduler.Task{},
 				},
 			},
@@ -96,7 +96,7 @@ func TestScheduler(t *testing.T) {
 		t.s.SetPlans([]scheduler.MetaPlan{
 			{
 				Plan: scheduler.Plan{
-					RepoPaths: map[string]string{"repo-a": "a"},
+					RepoPaths: map[string]scheduler.Repo{"repo-a": scheduler.Repo{Repo: "a"}},
 					Tasks:     []scheduler.Task{},
 				},
 				DoOnce: true,
@@ -105,7 +105,7 @@ func TestScheduler(t *testing.T) {
 		t.s.SetPlans([]scheduler.MetaPlan{
 			{
 				Plan: scheduler.Plan{
-					RepoPaths: map[string]string{"repo-a": "a"},
+					RepoPaths: map[string]scheduler.Repo{"repo-a": scheduler.Repo{Repo: "a"}},
 					Tasks:     []scheduler.Task{},
 				},
 				DoOnce: true,
@@ -119,7 +119,7 @@ func TestScheduler(t *testing.T) {
 		t.s.SetPlans([]scheduler.MetaPlan{
 			{
 				Plan: scheduler.Plan{
-					RepoPaths: map[string]string{"repo-a": "a"},
+					RepoPaths: map[string]scheduler.Repo{"repo-a": scheduler.Repo{Repo: "a"}},
 					Tasks:     []scheduler.Task{},
 				},
 			},
@@ -127,7 +127,7 @@ func TestScheduler(t *testing.T) {
 		t.s.SetPlans([]scheduler.MetaPlan{
 			{
 				Plan: scheduler.Plan{
-					RepoPaths: map[string]string{"repo-b": "b"},
+					RepoPaths: map[string]scheduler.Repo{"repo-b": scheduler.Repo{Repo: "b"}},
 					Tasks:     []scheduler.Task{},
 				},
 			},
@@ -137,7 +137,7 @@ func TestScheduler(t *testing.T) {
 		Expect(t, t.spyTaskManager.removes).To(Contain(
 			scheduler.MetaPlan{
 				Plan: scheduler.Plan{
-					RepoPaths: map[string]string{"repo-a": "a"},
+					RepoPaths: map[string]scheduler.Repo{"repo-a": scheduler.Repo{Repo: "a"}},
 					Tasks:     []scheduler.Task{},
 				},
 			},

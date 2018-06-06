@@ -149,17 +149,9 @@ func main() {
 							}
 						}
 
-						var doOnce bool
-						for _, repoPath := range plan.RepoPaths {
-							if repoPath == cfg.RepoPath {
-								doOnce = true
-								break
-							}
-						}
-
 						ts = append(ts, scheduler.MetaPlan{
 							Plan:   plan,
-							DoOnce: doOnce,
+							DoOnce: true,
 						})
 					}
 					sched.SetPlans(ts)
@@ -196,14 +188,14 @@ func main() {
 func fetchConfigFile(SHA, filePath string, repo git.Repo, fail, succ func(uint64), log *log.Logger) scheduler.Plans {
 	data, err := repo.File(SHA, filePath)
 	if err != nil {
-		log.Printf("failed to find config file: %s", err)
+		log.Printf("failed to find config file (%s): %s", SHA, err)
 		fail(1)
 		return scheduler.Plans{}
 	}
 
 	var t scheduler.Plans
 	if err := yaml.Unmarshal([]byte(data), &t); err != nil {
-		log.Printf("failed to find config file: %s", err)
+		log.Printf("failed to find config file (%s): %s", SHA, err)
 		fail(1)
 		return scheduler.Plans{}
 	}

@@ -15,10 +15,15 @@ type Plans struct {
 	Plans []Plan `yaml:"plans"`
 }
 
+type Repo struct {
+	Repo   string `yaml:"repo"`
+	Branch string `yaml:"branch"`
+}
+
 type Plan struct {
-	Name      string            `yaml:"name"`
-	RepoPaths map[string]string `yaml:"repo_paths"`
-	Tasks     []Task            `yaml:"tasks"`
+	Name      string          `yaml:"name"`
+	RepoPaths map[string]Repo `yaml:"repo_paths"`
+	Tasks     []Task          `yaml:"tasks"`
 }
 
 type Task struct {
