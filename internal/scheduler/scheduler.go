@@ -8,7 +8,8 @@ type Scheduler struct {
 
 type MetaPlan struct {
 	Plan
-	DoOnce bool
+	DoOnce    bool
+	ConfigSHA string
 }
 
 type Plans struct {

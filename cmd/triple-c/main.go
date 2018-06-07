@@ -51,7 +51,6 @@ func main() {
 					TLSHandshakeTimeout: 10 * time.Second,
 					TLSClientConfig: &tls.Config{
 						InsecureSkipVerify: cfg.SkipSSLValidation,
-						MinVersion:         tls.VersionTLS12,
 					},
 				},
 			},
@@ -149,9 +148,18 @@ func main() {
 							}
 						}
 
+						var doOnce bool
+						for _, repoPath := range plan.RepoPaths {
+							if repoPath.Repo == cfg.RepoPath {
+								doOnce = true
+								break
+							}
+						}
+
 						ts = append(ts, scheduler.MetaPlan{
-							Plan:   plan,
-							DoOnce: true,
+							Plan:      plan,
+							DoOnce:    doOnce,
+							ConfigSHA: sha,
 						})
 					}
 					sched.SetPlans(ts)

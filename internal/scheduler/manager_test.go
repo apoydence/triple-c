@@ -70,6 +70,7 @@ func TestManager(t *testing.T) {
 
 	o.Spec("it starts a task when a commit comes through", func(t TM) {
 		t.m.Add(scheduler.MetaPlan{
+			ConfigSHA: "config-sha",
 			Plan: scheduler.Plan{
 				RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path", Branch: "branch-b"}},
 				Tasks: []scheduler.Task{
@@ -94,6 +95,7 @@ func TestManager(t *testing.T) {
 		var m map[string]interface{}
 		Expect(t, json.Unmarshal(dataName, &m)).To(BeNil())
 		Expect(t, m["sha"]).To(Equal("some-sha"))
+		Expect(t, m["config_sha"]).To(Equal("config-sha"))
 		Expect(t, m["branch"]).To(Equal("branch-b"))
 		Expect(t, m["task_index"]).To(Equal(0.0))
 
@@ -323,6 +325,31 @@ func TestManager(t *testing.T) {
 
 		t.spyTaskCreator.listResults = []string{
 			base64.StdEncoding.EncodeToString([]byte(`{"sha":"some-sha","branch":"other-branch"}`)),
+		}
+
+		Expect(t, t.spyGitWatcher.commit).To(Not(BeNil()))
+		Expect(t, t.spyGitWatcher.branch).To(Equal("some-branch"))
+		t.spyGitWatcher.commit("some-sha")
+
+		Expect(t, t.spyTaskCreator.called).To(Equal(1))
+		Expect(t, t.spyMetrics.GetDelta("DedupedTasks")()).To(Equal(uint64(0)))
+	})
+
+	o.Spec("it does not dedupe commits on different config SHAs", func(t TM) {
+		t.m.Add(scheduler.MetaPlan{
+			ConfigSHA: "config-sha",
+			Plan: scheduler.Plan{
+				RepoPaths: map[string]scheduler.Repo{"some-repo": scheduler.Repo{Repo: "some-path"}},
+				Tasks: []scheduler.Task{
+					{
+						Command: "some-command",
+					},
+				},
+			},
+		})
+
+		t.spyTaskCreator.listResults = []string{
+			base64.StdEncoding.EncodeToString([]byte(`{"sha":"some-sha","branch":"some-branch","config_sha":"other-sha"}`)),
 		}
 
 		Expect(t, t.spyGitWatcher.commit).To(Not(BeNil()))

@@ -156,7 +156,7 @@ func (m *Manager) startPlanForSHA(SHA, branch string, t MetaPlan, taskLock *sync
 		return
 	}
 
-	dupe, err := m.duplicate(branch, SHA)
+	dupe, err := m.duplicate(branch, SHA, t.ConfigSHA)
 	if err != nil {
 		m.log.Printf("failed deduping tasks: %s", err)
 		return
@@ -227,10 +227,12 @@ func (m *Manager) startTaskForSHA(SHA, branch string, task Task, t MetaPlan, tas
 		SHA       string `json:"sha"`
 		Branch    string `json:"branch"`
 		TaskIndex int    `json:"task_index"`
+		ConfigSHA string `json:"config_sha"`
 	}{
 		SHA:       SHA,
 		Branch:    branch,
 		TaskIndex: taskIndex,
+		ConfigSHA: t.ConfigSHA,
 	})
 	if err != nil {
 		m.log.Printf("failed to marshal task name: %s", err)
@@ -253,7 +255,7 @@ func (m *Manager) startTaskForSHA(SHA, branch string, task Task, t MetaPlan, tas
 	return true
 }
 
-func (m *Manager) duplicate(branch, SHA string) (bool, error) {
+func (m *Manager) duplicate(branch, SHA, configSHA string) (bool, error) {
 	tasks, err := m.taskCreator.ListTasks(m.appGuid)
 	if err != nil {
 		return false, err
@@ -266,14 +268,15 @@ func (m *Manager) duplicate(branch, SHA string) (bool, error) {
 		}
 
 		var taskMeta struct {
-			SHA    string `json:"sha"`
-			Branch string `json:"branch"`
+			SHA       string `json:"sha"`
+			Branch    string `json:"branch"`
+			ConfigSHA string `json:"config_sha"`
 		}
 		if err := json.Unmarshal(data, &taskMeta); err != nil {
 			continue
 		}
 
-		if taskMeta.Branch == branch && taskMeta.SHA == SHA {
+		if taskMeta.Branch == branch && taskMeta.SHA == SHA && taskMeta.ConfigSHA == configSHA {
 			return true, nil
 		}
 	}
