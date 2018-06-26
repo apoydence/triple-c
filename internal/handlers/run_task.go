@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 
 	faas "github.com/apoydence/cf-faas"
@@ -16,11 +17,12 @@ import (
 const magicPrefix = "<--magic-identifier-->"
 
 type RunTask struct {
-	command        string
-	d              Doer
-	r              TaskRunner
-	children       []string
-	redirectFormat string
+	command         string
+	expectedHeaders []string
+	d               Doer
+	r               TaskRunner
+	children        []string
+	redirectFormat  string
 }
 
 type Doer interface {
@@ -33,17 +35,19 @@ type TaskRunner interface {
 
 func NewRunTask(
 	command string,
+	expectedHeaders []string,
 	d Doer,
 	r TaskRunner,
 	children []string,
 	redirectFormat string, // e.g., http://some.addr/tasks/%s/lookup
 ) faas.Handler {
 	return &RunTask{
-		command:        command,
-		d:              d,
-		r:              r,
-		children:       children,
-		redirectFormat: redirectFormat,
+		command:         command,
+		expectedHeaders: expectedHeaders,
+		d:               d,
+		r:               r,
+		children:        children,
+		redirectFormat:  redirectFormat,
 	}
 }
 
@@ -84,7 +88,13 @@ func (r *RunTask) Handle(req faas.Request) (faas.Response, error) {
 }
 
 func (r *RunTask) encodeTaskName(req faas.Request) string {
-	req.Headers = nil
+	header := http.Header{}
+	for _, h := range r.expectedHeaders {
+		h = strings.Title(h)
+		header[h] = req.Header[h]
+	}
+
+	req.Header = header
 	data, err := json.Marshal(req)
 	if err != nil {
 		log.Panic(err)

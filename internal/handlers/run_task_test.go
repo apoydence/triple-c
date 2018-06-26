@@ -43,7 +43,14 @@ func TestRunTask(t *testing.T) {
 			spyDoer:       spyDoer,
 			spyTaskRunner: spyTaskRunner,
 			children:      children,
-			h:             handlers.NewRunTask("some-command", spyDoer, spyTaskRunner, children, "http://some.addr/tasks/%s/lookup"),
+			h: handlers.NewRunTask(
+				"some-command",
+				[]string{"a", "b"},
+				spyDoer,
+				spyTaskRunner,
+				children,
+				"http://some.addr/tasks/%s/lookup",
+			),
 		}
 	})
 
@@ -90,16 +97,56 @@ func TestRunTask(t *testing.T) {
 		Expect(t, t.spyTaskRunner.command).To(ContainSubstring("echo '<--magic-identifier--> |"))
 	})
 
-	o.Spec("names a task deterministically", func(t TR) {
+	o.Spec("it includes expected headers in the name", func(t TR) {
 		req := faas.Request{
 			Path:   "/v1/some/path",
 			Method: "GET",
+			Header: http.Header{
+				"a": []string{"b", "c"},
+				"d": []string{"e"},
+			},
+		}
+		t.h.Handle(req)
+
+		nameA := t.spyTaskRunner.name
+
+		req = faas.Request{
+			Path:   "/v1/some/path",
+			Method: "GET",
+			Header: http.Header{
+				"a": []string{"x", "y"},
+				"d": []string{"e"},
+			},
+		}
+		t.h.Handle(req)
+
+		nameB := t.spyTaskRunner.name
+		Expect(t, nameA).To(Not(Equal(nameB)))
+	})
+
+	o.Spec("names a task deterministically for the expected headers", func(t TR) {
+		req := faas.Request{
+			Path:   "/v1/some/path",
+			Method: "GET",
+			Header: http.Header{
+				"a": []string{"b", "c"},
+				"d": []string{"e"},
+			},
 		}
 		t.h.Handle(req)
 
 		Expect(t, t.spyTaskRunner.name).To(Not(Equal("")))
 		name := t.spyTaskRunner.name
 		for i := 0; i < 1000; i++ {
+			req := faas.Request{
+				Path:   "/v1/some/path",
+				Method: "GET",
+				Header: http.Header{
+					"a": []string{"b", "c"},
+					"d": []string{"e"},
+					fmt.Sprintf("dont-include-%d", time.Now().UnixNano()): []string{fmt.Sprint(time.Now().UnixNano())},
+				},
+			}
 			t.h.Handle(req)
 
 			Expect(t, t.spyTaskRunner.name).To(Equal(name))

@@ -30,6 +30,7 @@ func main() {
 
 	faas.Start(handlers.NewRunTask(
 		cfg.Command,
+		cfg.ExpectedHeaders,
 		http.DefaultClient,
 		taskRunner,
 		cfg.Children,

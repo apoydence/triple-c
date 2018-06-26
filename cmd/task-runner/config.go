@@ -9,6 +9,9 @@ import (
 type Config struct {
 	Command string `env:"COMMAND, required"`
 
+	// These headers are used to distinguish tasks.
+	ExpectedHeaders []string `env:"EXPECTED_HEADERS"`
+
 	// HttpProxy is not used directly, however the CAPI client assumes its
 	// going through a proxy for auth.
 	HttpProxy string `env:"HTTP_PROXY, required"`
