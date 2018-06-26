@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"strings"
 
 	"code.cloudfoundry.org/go-envstruct"
 )
@@ -18,6 +19,9 @@ type VcapApplication struct {
 	ApplicationID   string   `json:"application_id"`
 	ApplicationURIs []string `json:"application_uris"`
 	SpaceID         string   `json:"space_id"`
+
+	// Inferred from CAPIAddr
+	LogCacheAddr string
 }
 
 func (a *VcapApplication) UnmarshalEnv(data string) error {
@@ -30,6 +34,11 @@ func LoadConfig() (Config, error) {
 	if err := envstruct.Load(&cfg); err != nil {
 		return Config{}, err
 	}
+
+	cfg.VcapApplication.LogCacheAddr = strings.Replace(
+		strings.Replace(cfg.VcapApplication.CAPIAddr, "https", "http", 1), // Use http so we benefit from the HTTP_PROXY
+		"api", "log-cache", 1,
+	)
 
 	return cfg, nil
 }

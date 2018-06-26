@@ -6,13 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"time"
 
 	faas "github.com/apoydence/cf-faas"
 )
 
+const magicPrefix = "<--magic-identifier-->"
+
 type RunTask struct {
+	command        string
 	d              Doer
 	r              TaskRunner
 	children       []string
@@ -24,22 +28,18 @@ type Doer interface {
 }
 
 type TaskRunner interface {
-	RunTask(name string) (string, error)
-}
-
-type TaskRunnerFunc func() (string, error)
-
-func (f TaskRunnerFunc) RunTask() (string, error) {
-	return f()
+	RunTask(command, name string) (string, error)
 }
 
 func NewRunTask(
+	command string,
 	d Doer,
 	r TaskRunner,
 	children []string,
 	redirectFormat string, // e.g., http://some.addr/tasks/%s/lookup
 ) faas.Handler {
 	return &RunTask{
+		command:        command,
 		d:              d,
 		r:              r,
 		children:       children,
@@ -70,7 +70,7 @@ func (r *RunTask) Handle(req faas.Request) (faas.Response, error) {
 		}
 	}
 
-	taskGuid, err := r.r.RunTask(r.encodeTaskName(req))
+	taskGuid, err := r.r.RunTask(r.includeMagicIdentifier(), r.encodeTaskName(req))
 	if err != nil {
 		return faas.Response{}, err
 	}
@@ -91,4 +91,12 @@ func (r *RunTask) encodeTaskName(req faas.Request) string {
 	}
 
 	return base64.StdEncoding.EncodeToString(data)
+}
+
+func (r *RunTask) includeMagicIdentifier() string {
+	return fmt.Sprintf(`
+echo '%s |%d%d|'
+
+%s
+`, magicPrefix, time.Now().UnixNano(), rand.Int(), r.command)
 }

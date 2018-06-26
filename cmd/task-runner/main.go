@@ -24,12 +24,12 @@ func main() {
 	)
 
 	taskRunner := capi.NewTaskRunner(
-		cfg.Command,
 		cfg.ScriptAppName,
 		client,
 	)
 
 	faas.Start(handlers.NewRunTask(
+		cfg.Command,
 		http.DefaultClient,
 		taskRunner,
 		cfg.Children,

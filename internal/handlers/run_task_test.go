@@ -43,7 +43,7 @@ func TestRunTask(t *testing.T) {
 			spyDoer:       spyDoer,
 			spyTaskRunner: spyTaskRunner,
 			children:      children,
-			h:             handlers.NewRunTask(spyDoer, spyTaskRunner, children, "http://some.addr/tasks/%s/lookup"),
+			h:             handlers.NewRunTask("some-command", spyDoer, spyTaskRunner, children, "http://some.addr/tasks/%s/lookup"),
 		}
 	})
 
@@ -76,9 +76,18 @@ func TestRunTask(t *testing.T) {
 		resp, err := t.h.Handle(faas.Request{})
 		Expect(t, err).To(BeNil())
 
+		Expect(t, t.spyTaskRunner.command).To(ContainSubstring("some-command"))
 		Expect(t, t.spyTaskRunner.name).To(Not(Equal("")))
 		Expect(t, resp.StatusCode).To(Equal(http.StatusFound))
 		Expect(t, resp.Header["Location"]).To(Equal([]string{"http://some.addr/tasks/task-guid/lookup"}))
+	})
+
+	o.Spec("prefixes command with echo that will help identify the container index", func(t TR) {
+		t.spyTaskRunner.result = "task-guid"
+		_, err := t.h.Handle(faas.Request{})
+		Expect(t, err).To(BeNil())
+
+		Expect(t, t.spyTaskRunner.command).To(ContainSubstring("echo '<--magic-identifier--> |"))
 	})
 
 	o.Spec("names a task deterministically", func(t TR) {
@@ -172,16 +181,18 @@ func (s *spyDoer) Reqs() []*http.Request {
 }
 
 type spyTaskRunner struct {
-	name   string
-	result string
-	err    error
+	command string
+	name    string
+	result  string
+	err     error
 }
 
 func newSpyTaskRunner() *spyTaskRunner {
 	return &spyTaskRunner{}
 }
 
-func (s *spyTaskRunner) RunTask(name string) (string, error) {
+func (s *spyTaskRunner) RunTask(command, name string) (string, error) {
+	s.command = command
 	s.name = name
 	return s.result, s.err
 }

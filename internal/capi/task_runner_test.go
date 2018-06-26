@@ -29,7 +29,7 @@ func TestTaskRunner(t *testing.T) {
 		return TR{
 			T:         t,
 			spyClient: spyClient,
-			r:         capi.NewTaskRunner("some-command", "some-app-name", spyClient),
+			r:         capi.NewTaskRunner("some-app-name", spyClient),
 		}
 	})
 
@@ -43,7 +43,7 @@ func TestTaskRunner(t *testing.T) {
 			{Name: "some-other-name", Guid: "some-other-guid"},
 		}
 
-		guid, err := t.r.RunTask("some-name")
+		guid, err := t.r.RunTask("some-command", "some-name")
 		Expect(t, err).To(BeNil())
 		Expect(t, guid).To(Equal("task-guid"))
 
@@ -75,19 +75,19 @@ func TestTaskRunner(t *testing.T) {
 
 	o.Spec("it returns an error if looking up the guid fails", func(t TR) {
 		t.spyClient.appGuidErr = errors.New("some-error")
-		_, err := t.r.RunTask("some-name")
+		_, err := t.r.RunTask("some-command", "some-name")
 		Expect(t, err).To(Not(BeNil()))
 	})
 
 	o.Spec("it returns an error if creating the task fails", func(t TR) {
 		t.spyClient.runErr = errors.New("some-error")
-		_, err := t.r.RunTask("some-name")
+		_, err := t.r.RunTask("some-command", "some-name")
 		Expect(t, err).To(Not(BeNil()))
 	})
 
 	o.Spec("it returns an error if listing tasks fails", func(t TR) {
 		t.spyClient.listErr = errors.New("some-error")
-		_, err := t.r.RunTask("some-name")
+		_, err := t.r.RunTask("some-command", "some-name")
 		Expect(t, err).To(Not(BeNil()))
 	})
 
@@ -98,7 +98,7 @@ func TestTaskRunner(t *testing.T) {
 			{Name: "some-other-name", Guid: "some-other-guid"},
 		}
 
-		guid, err := t.r.RunTask("some-name")
+		guid, err := t.r.RunTask("some-command", "some-name")
 		Expect(t, err).To(BeNil())
 		Expect(t, guid).To(Equal("some-guid"))
 

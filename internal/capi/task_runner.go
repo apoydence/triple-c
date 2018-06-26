@@ -8,7 +8,6 @@ import (
 )
 
 type TaskRunner struct {
-	command string
 	droplet string
 	appName string
 	c       Client
@@ -20,15 +19,14 @@ type Client interface {
 	ListTasks(ctx context.Context, appGuid string, query map[string][]string) ([]capi.Task, error)
 }
 
-func NewTaskRunner(command, appName string, c Client) *TaskRunner {
+func NewTaskRunner(appName string, c Client) *TaskRunner {
 	return &TaskRunner{
-		command: command,
 		appName: appName,
 		c:       c,
 	}
 }
 
-func (r *TaskRunner) RunTask(name string) (string, error) {
+func (r *TaskRunner) RunTask(command, name string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -50,7 +48,7 @@ func (r *TaskRunner) RunTask(name string) (string, error) {
 		}
 	}
 
-	t, err := r.c.RunTask(ctx, r.command, name, r.droplet, appGuid)
+	t, err := r.c.RunTask(ctx, command, name, r.droplet, appGuid)
 	if err != nil {
 		return "", err
 	}
