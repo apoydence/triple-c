@@ -22,6 +22,7 @@ type Config struct {
 
 	Path string `env:"PATH, required"`
 
+	// Children are paths to dependencies that must pass first.
 	Children        []string        `env:"CHILDREN"`
 	VcapApplication VcapApplication `env:"VCAP_APPLICATION, required"`
 }
@@ -42,6 +43,10 @@ func LoadConfig() (Config, error) {
 
 	if err := envstruct.Load(&cfg); err != nil {
 		return Config{}, err
+	}
+
+	for i, c := range cfg.Children {
+		cfg.Children[i] = "http://" + cfg.VcapApplication.ApplicationURIs[0] + c
 	}
 
 	return cfg, nil
