@@ -78,7 +78,10 @@ func TestTaskChecker(t *testing.T) {
 		}
 
 		resp, err := t.c.Handle(faas.Request{
-			Path: "/v1/some-path/tasks/some-guid",
+			Path: "/v1/some-path/tasks/wrong-guid", // We want the code pulling from the URL Variables
+			URLVariables: map[string]string{
+				"task-guid": "some-guid",
+			},
 		})
 		Expect(t, err).To(BeNil())
 

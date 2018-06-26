@@ -102,8 +102,8 @@ func TestRunTask(t *testing.T) {
 			Path:   "/v1/some/path",
 			Method: "GET",
 			Header: http.Header{
-				"a": []string{"b", "c"},
-				"d": []string{"e"},
+				"A": []string{"b", "c"},
+				"D": []string{"e"},
 			},
 		}
 		t.h.Handle(req)
@@ -114,8 +114,8 @@ func TestRunTask(t *testing.T) {
 			Path:   "/v1/some/path",
 			Method: "GET",
 			Header: http.Header{
-				"a": []string{"x", "y"},
-				"d": []string{"e"},
+				"A": []string{"x", "y"},
+				"D": []string{"e"},
 			},
 		}
 		t.h.Handle(req)
@@ -129,8 +129,8 @@ func TestRunTask(t *testing.T) {
 			Path:   "/v1/some/path",
 			Method: "GET",
 			Header: http.Header{
-				"a": []string{"b", "c"},
-				"d": []string{"e"},
+				"A": []string{"b", "c"},
+				"D": []string{"e"},
 			},
 		}
 		t.h.Handle(req)
@@ -142,8 +142,8 @@ func TestRunTask(t *testing.T) {
 				Path:   "/v1/some/path",
 				Method: "GET",
 				Header: http.Header{
-					"a": []string{"b", "c"},
-					"d": []string{"e"},
+					"A": []string{"b", "c"},
+					"D": []string{"e"},
 					fmt.Sprintf("dont-include-%d", time.Now().UnixNano()): []string{fmt.Sprint(time.Now().UnixNano())},
 				},
 			}

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"path"
 	"strings"
 	"time"
 
@@ -47,7 +46,7 @@ func NewTaskChecker(g TaskGetter, r TaskLogReader, d Doer) *TaskChecker {
 }
 
 func (t *TaskChecker) Handle(r faas.Request) (faas.Response, error) {
-	_, taskGuid := path.Split(r.Path)
+	taskGuid := r.URLVariables["task-guid"]
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
