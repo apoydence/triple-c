@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/apoydence/onpar"
-	. "github.com/apoydence/onpar/expect"
-	. "github.com/apoydence/onpar/matchers"
-	"github.com/apoydence/triple-c/internal/git"
+	"github.com/poy/onpar"
+	. "github.com/poy/onpar/expect"
+	. "github.com/poy/onpar/matchers"
+	"github.com/poy/triple-c/internal/git"
 )
 
 type TR struct {

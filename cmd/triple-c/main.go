@@ -15,11 +15,11 @@ import (
 	"time"
 
 	envstruct "code.cloudfoundry.org/go-envstruct"
-	"github.com/apoydence/triple-c/internal/capi"
-	"github.com/apoydence/triple-c/internal/git"
-	"github.com/apoydence/triple-c/internal/handlers"
-	"github.com/apoydence/triple-c/internal/metrics"
-	"github.com/apoydence/triple-c/internal/scheduler"
+	"github.com/poy/triple-c/internal/capi"
+	"github.com/poy/triple-c/internal/git"
+	"github.com/poy/triple-c/internal/handlers"
+	"github.com/poy/triple-c/internal/metrics"
+	"github.com/poy/triple-c/internal/scheduler"
 	"github.com/cloudfoundry-incubator/uaago"
 	"gopkg.in/yaml.v2"
 )

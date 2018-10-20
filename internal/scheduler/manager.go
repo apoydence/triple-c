@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/apoydence/triple-c/internal/git"
+	"github.com/poy/triple-c/internal/git"
 )
 
 type Manager struct {

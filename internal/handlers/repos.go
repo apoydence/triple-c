@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/apoydence/triple-c/internal/metrics"
+	"github.com/poy/triple-c/internal/metrics"
 )
 
 type Repos struct {

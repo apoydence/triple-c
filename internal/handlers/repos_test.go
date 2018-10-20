@@ -7,11 +7,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/apoydence/onpar"
-	. "github.com/apoydence/onpar/expect"
-	. "github.com/apoydence/onpar/matchers"
-	"github.com/apoydence/triple-c/internal/handlers"
-	"github.com/apoydence/triple-c/internal/metrics"
+	"github.com/poy/onpar"
+	. "github.com/poy/onpar/expect"
+	. "github.com/poy/onpar/matchers"
+	"github.com/poy/triple-c/internal/handlers"
+	"github.com/poy/triple-c/internal/metrics"
 )
 
 type TB struct {

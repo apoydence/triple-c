@@ -4,7 +4,7 @@ plans:
 - name: triple-c's CI/CD
   repo_paths:
     triple-c:
-      repo: https://github.com/apoydence/triple-c
+      repo: https://github.com/poy/triple-c
   tasks:
   - name: CI
     output: binary
@@ -32,14 +32,14 @@ plans:
 
       go version
 
-      mkdir -p $GOPATH/src/github.com/apoydence/
-      mv triple-c $GOPATH/src/github.com/apoydence/
-      pushd $GOPATH/src/github.com/apoydence/triple-c
+      mkdir -p $GOPATH/src/github.com/poy/
+      mv triple-c $GOPATH/src/github.com/poy/
+      pushd $GOPATH/src/github.com/poy/triple-c
           go get -t -d ./...
           go test --race ./...
       popd
 
-      pushd $GOPATH/src/github.com/apoydence/triple-c/cmd/triple-c
+      pushd $GOPATH/src/github.com/poy/triple-c/cmd/triple-c
           go build -o $OUTPUT/triple-c
       popd
 
@@ -92,7 +92,7 @@ plans:
       chmod 600 $HOME/.ssh/bot_key
 
       pushd triple-c
-        git remote set-url origin git@github.com:apoydence/triple-c.git
+        git remote set-url origin git@github.com:poy/triple-c.git
         git checkout master
         git merge origin/develop --ff-only
         git config --global push.default simple
